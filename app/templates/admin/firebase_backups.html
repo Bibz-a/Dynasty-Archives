@@ -60,10 +60,11 @@
                       <div class="restore-form">
                         <p class="restore-warning">
                           <i class="ti ti-alert-triangle"></i>
-                          This will replace all current data (dynasties, rulers, events, territories, etc.) with data from
-                          <strong>{{ b.folder }}</strong>.
-                          Your schema and user accounts will not be changed.
-                          This cannot be undone.
+                          Truncates and reloads <strong>only</strong> catalog tables covered by backups (dynasties, rulers,
+                          reigns, events, territories, links, edit requests, audit rows). Each backup statement must be a plain
+                          <code>INSERT</code> into those tables; anything else is rejected before your database is touched.
+                          <strong>Schema and user accounts are never modified.</strong> Source:
+                          <strong>{{ b.folder }}</strong>. This cannot be undone.
                         </p>
                         <form method="POST" action="{{ url_for('admin.firebase_backup_restore', key=b.key) }}">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

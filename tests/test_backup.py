@@ -60,6 +60,46 @@ def test_backup_post_uploads_to_firebase_and_supabase(mock_ref, mock_dump, mock_
 
 
 @patch("firebase_admin.db.reference")
+def test_firebase_restore_rejects_user_account_insert(mock_ref, admin_client, test_user_credentials):
+    tables_payload = {
+        "dynasty": {
+            "content_b64": base64.b64encode(
+                b"INSERT INTO user_account (username, password, role) VALUES ('x', 'y', 'admin');"
+            ).decode("ascii")
+        }
+    }
+    mock_ref.return_value.get.return_value = {"metadata": {"folder": "bad"}, "tables": tables_payload}
+
+    captured: dict = {}
+    with patch("psycopg2.connect", side_effect=_make_connect_fake(captured)):
+        admin_client.post(
+            "/admin/backups/firebase/bad_key/restore",
+            data={"password": test_user_credentials["admin_password"]},
+        )
+    assert "conn" not in captured
+
+
+@patch("firebase_admin.db.reference")
+def test_firebase_restore_rejects_mismatched_chunk_table(mock_ref, admin_client, test_user_credentials):
+    tables_payload = {
+        "dynasty": {
+            "content_b64": base64.b64encode(
+                b"INSERT INTO person (full_name) VALUES ('wrong chunk');"
+            ).decode("ascii")
+        }
+    }
+    mock_ref.return_value.get.return_value = {"metadata": {"folder": "bad"}, "tables": tables_payload}
+
+    captured: dict = {}
+    with patch("psycopg2.connect", side_effect=_make_connect_fake(captured)):
+        admin_client.post(
+            "/admin/backups/firebase/bad_key/restore",
+            data={"password": test_user_credentials["admin_password"]},
+        )
+    assert "conn" not in captured
+
+
+@patch("firebase_admin.db.reference")
 def test_firebase_restore_applies_truncate_and_inserts(mock_ref, admin_client, test_user_credentials):
     """Safe: restore's positional-DSN connection is mocked; real DB still used for login/password checks."""
     tables_payload = {

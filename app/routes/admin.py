@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import base64
 import subprocess
 from collections import defaultdict
@@ -1127,6 +1128,148 @@ RESTORE_ORDER = [
     "audit_log",
 ]
 
+RESTORE_ALLOWED_TABLES_LOWER = frozenset(t.lower() for t in BACKUP_TABLES)
+
+_FORBIDDEN_SQL_CONSTRUCTS_OUTSIDE_QUOTES = frozenset(
+    (
+        "SELECT",
+        "DROP",
+        "DELETE",
+        "UPDATE",
+        "TRUNCATE",
+        "ALTER",
+        "CREATE",
+        "GRANT",
+        "REVOKE",
+        "COPY",
+        "EXECUTE",
+        "CALL",
+        "DO",
+        "PREPARE",
+        "LISTEN",
+        "NOTIFY",
+        "VACUUM",
+        "CLUSTER",
+    )
+)
+
+_INSERT_TARGET_RE = re.compile(
+    r"""
+    ^\s*INSERT\s+INTO\s+(?:ONLY\s+)?
+    (?:(?P<schema>[a-z_][a-z0-9_]*)\.)?
+    (?:
+        "(?P<quoted>(?:[^"]|"")*)"
+        |
+        (?P<bare>[a-z_][a-z0-9_]*)
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE | re.DOTALL,
+)
+
+
+def _truncate_catalog_tables_sql() -> str:
+    """Truncate only catalog tables included in backups (never User_Account or other app tables)."""
+    tables = ", ".join(RESTORE_ORDER)
+    return f"TRUNCATE TABLE {tables} RESTART IDENTITY CASCADE;"
+
+
+def _sql_outside_single_quoted_strings(sql: str) -> str:
+    """Concatenate regions outside standard single-quoted literals for keyword safety scans."""
+    parts: list[str] = []
+    i = 0
+    n = len(sql)
+    chunk_start = 0
+    while i < n:
+        if sql[i] == "'":
+            parts.append(sql[chunk_start:i])
+            i += 1
+            while i < n:
+                if sql[i] == "'":
+                    if i + 1 < n and sql[i + 1] == "'":
+                        i += 2
+                        continue
+                    i += 1
+                    break
+                i += 1
+            chunk_start = i
+            continue
+        i += 1
+    parts.append(sql[chunk_start:])
+    return " ".join(parts)
+
+
+def _validate_restore_insert_statement(
+    stmt: str,
+    *,
+    expected_table_lower: str | None = None,
+) -> str:
+    """
+    Allow only INSERT into BACKUP_TABLES in schema public (pg_dump --data-only style).
+    Blocks DDL, DML other than INSERT, subqueries (SELECT), and User_Account / other tables.
+    """
+    raw = (stmt or "").strip()
+    if not raw:
+        raise ValueError("Empty SQL statement in backup.")
+
+    outside = _sql_outside_single_quoted_strings(raw)
+    outside_upper = outside.upper()
+    if outside_upper.count("INSERT INTO") != 1:
+        raise ValueError("Each backup statement must be exactly one INSERT INTO … statement.")
+
+    insert_pos = outside_upper.index("INSERT INTO")
+    if insert_pos < 0:
+        raise ValueError("Expected INSERT INTO … statement.")
+    prefix = outside_upper[:insert_pos]
+    if prefix.strip():
+        raise ValueError("Restore only allows INSERT statements with no leading SQL.")
+
+    tail_scan = outside_upper[insert_pos + len("INSERT INTO") :]
+    for word in _FORBIDDEN_SQL_CONSTRUCTS_OUTSIDE_QUOTES:
+        if re.search(rf"\b{re.escape(word)}\b", tail_scan):
+            raise ValueError(f"Disallowed SQL in backup data restore: {word}")
+
+    m = _INSERT_TARGET_RE.match(raw)
+    if not m:
+        raise ValueError("Malformed INSERT in backup (expected pg_dump column-inserts shape).")
+
+    schema = (m.group("schema") or "").lower()
+    if schema and schema != "public":
+        raise ValueError("Restore only allows inserts into schema public.")
+
+    quoted = m.group("quoted")
+    bare = m.group("bare")
+    if quoted is not None:
+        tname = quoted.replace('""', '"').lower()
+    else:
+        tname = (bare or "").lower()
+
+    if tname not in RESTORE_ALLOWED_TABLES_LOWER:
+        raise ValueError(f"Restore cannot load table {tname!r} (not part of catalog backups).")
+
+    if expected_table_lower is not None and tname != expected_table_lower:
+        raise ValueError(
+            f"Backup chunk for {expected_table_lower!r} contained INSERT into {tname!r}."
+        )
+
+    return raw
+
+
+def _decode_validate_split_table_sql(
+    encoded_b64: str,
+    *,
+    expected_table_lower: str | None,
+) -> list[str]:
+    sql = base64.b64decode(encoded_b64.encode("utf-8")).decode("utf-8")
+    sql = clean_pg_dump(sql)
+    if not sql.strip():
+        return []
+    validated: list[str] = []
+    for stmt in _split_sql_statements(sql):
+        validated.append(
+            _validate_restore_insert_statement(stmt, expected_table_lower=expected_table_lower)
+        )
+    return validated
+
 
 def _dump_table(table: str, libpq_url: str) -> str:
     """Run pg_dump for a single table; return cleaned SQL (empty if no data statements)."""
@@ -1440,29 +1583,26 @@ def firebase_backup_restore(key: str):
         flash(f"Failed to fetch backup from Firebase: {e}", "error")
         return redirect(url_for("admin.firebase_backups"))
 
-    database_url = os.environ.get("DATABASE_URL")
+    database_url = (os.environ.get("DATABASE_URL") or "").strip()
     if not database_url:
         flash("Restore failed: DATABASE_URL is not configured.", "error")
+        return redirect(url_for("admin.firebase_backups"))
+
+    try:
+        libpq_url = _normalize_database_url_for_pg_tools(database_url)
+        _validate_libpq_database_url(libpq_url)
+    except ValueError as e:
+        flash(f"Restore failed: invalid DATABASE_URL ({e}).", "error")
         return redirect(url_for("admin.firebase_backups"))
 
     folder_label = data.get("metadata", {}).get("folder", key) if isinstance(data.get("metadata"), dict) else key
     tables_payload = data.get("tables")
 
-    conn = psycopg2.connect(database_url)
-    conn.autocommit = False
-    cur = conn.cursor()
+    statements_to_run: list[str] = []
+    restore_details = ""
 
     try:
         if isinstance(tables_payload, dict):
-            cur.execute(
-                """
-                TRUNCATE TABLE
-                    edit_request, audit_log, event_relation, succession, relation,
-                    parent_child, person_event, dynasty_territory,
-                    event, reign, person, territory, dynasty
-                RESTART IDENTITY CASCADE;
-                """
-            )
             for table in RESTORE_ORDER:
                 if table not in tables_payload:
                     continue
@@ -1470,84 +1610,99 @@ def firebase_backup_restore(key: str):
                 if not isinstance(tnode, dict):
                     continue
                 encoded = str(tnode.get("content_b64") or "")
-                if not encoded:
+                if not encoded.strip():
                     continue
-                sql = base64.b64decode(encoded.encode("utf-8")).decode("utf-8")
-                sql = clean_pg_dump(sql)
-                if not sql.strip():
-                    continue
-                for stmt in _split_sql_statements(sql):
-                    cur.execute(stmt)
-            details = f"Restored multi-table backup: {folder_label}"
-            cur.execute(
-                """
-                INSERT INTO Audit_Log (table_name, operation, performed_by, details)
-                VALUES ('DATABASE', 'RESTORE', %s, %s)
-                """,
-                (current_user.username, details),
-            )
-            conn.commit()
-            flash(f"Database restored successfully from {folder_label}.", "success")
-            return redirect(url_for("admin.dashboard"))
+                statements_to_run.extend(
+                    _decode_validate_split_table_sql(encoded, expected_table_lower=table.lower())
+                )
+            if not statements_to_run:
+                flash(
+                    "Restore aborted: backup contained no valid INSERT data for catalog tables.",
+                    "error",
+                )
+                return redirect(url_for("admin.firebase_backups"))
+            restore_details = f"Restored multi-table backup: {folder_label}"
 
-        if "content_b64" in data:
+        elif "content_b64" in data:
             try:
                 sql_content = base64.b64decode(str(data["content_b64"]).encode("utf-8")).decode("utf-8")
             except Exception as e:
                 flash(f"Failed to decode backup content: {e}", "error")
-                conn.rollback()
                 return redirect(url_for("admin.firebase_backups"))
+            sql_content = clean_pg_dump(sql_content)
+            for stmt in _split_sql_statements(sql_content):
+                statements_to_run.append(_validate_restore_insert_statement(stmt, expected_table_lower=None))
+            if not statements_to_run:
+                flash("Restore aborted: legacy backup had no valid INSERT statements.", "error")
+                return redirect(url_for("admin.firebase_backups"))
+            filename = data.get("filename", key)
+            restore_details = f"Restored legacy Firebase backup: {filename}"
+
         elif "content" in data:
-            sql_content = str(data["content"] or "")
+            sql_content = clean_pg_dump(str(data["content"] or ""))
+            for stmt in _split_sql_statements(sql_content):
+                statements_to_run.append(_validate_restore_insert_statement(stmt, expected_table_lower=None))
+            if not statements_to_run:
+                flash("Restore aborted: legacy backup had no valid INSERT statements.", "error")
+                return redirect(url_for("admin.firebase_backups"))
+            filename = data.get("filename", key)
+            restore_details = f"Restored legacy Firebase backup: {filename}"
+
         else:
-            flash("Backup not found or uses an unknown format (expected tables or content_b64).", "error")
-            conn.rollback()
+            flash(
+                "Backup not found or uses an unknown format (expected tables, content_b64, or content).",
+                "error",
+            )
             return redirect(url_for("admin.firebase_backups"))
 
-        sql_content = clean_pg_dump(sql_content)
-        if len(sql_content.strip()) < 100:
-            flash("Backup content is too short to be valid SQL. Restore aborted.", "error")
-            conn.rollback()
-            return redirect(url_for("admin.firebase_backups"))
+    except ValueError as e:
+        flash(f"Restore aborted: invalid or unsafe backup SQL ({e})", "error")
+        return redirect(url_for("admin.firebase_backups"))
 
-        filename = data.get("filename", key)
-        has_schema_changes = "CREATE TABLE" in sql_content.upper() or "DROP TABLE" in sql_content.upper()
-        cur.execute(
-            """
-            TRUNCATE TABLE
-                Dynasty_Territory, Person_Event, Parent_Child,
-                Succession, Edit_Request, Relation, Event_Relation,
-                Audit_Log, Event, Territory, Reign, Person, Dynasty
-            RESTART IDENTITY CASCADE;
-            """
-        )
-        for stmt in _split_sql_statements(sql_content):
+    conn = None
+    cur = None
+    try:
+        conn = psycopg2.connect(libpq_url)
+        conn.autocommit = False
+        cur = conn.cursor()
+
+        cur.execute(_truncate_catalog_tables_sql())
+
+        for stmt in statements_to_run:
             cur.execute(stmt)
-        details = f"Restored from Firebase backup: {filename} | Schema changes: {'yes' if has_schema_changes else 'no'}"
+
         cur.execute(
             """
             INSERT INTO Audit_Log (table_name, operation, performed_by, details)
             VALUES ('DATABASE', 'RESTORE', %s, %s)
             """,
-            (current_user.username, details),
+            (current_user.username, restore_details),
         )
         conn.commit()
-        if has_schema_changes:
-            flash(f"Database restored from {filename}. Warning: schema changes were detected in this dump.", "warning")
-        else:
-            flash(f"Database restored successfully from {filename}.", "success")
+        label = folder_label if isinstance(tables_payload, dict) else data.get("filename", key)
+        flash(
+            f"Catalog data restored from {label}. "
+            "User accounts and schema were not modified by this operation.",
+            "success",
+        )
         return redirect(url_for("admin.dashboard"))
 
     except Exception as e:
-        conn.rollback()
+        if conn is not None:
+            conn.rollback()
         flash(f"Restore failed: {e}", "error")
         return redirect(url_for("admin.firebase_backups"))
     finally:
-        try:
-            cur.close()
-            conn.close()
-        except Exception:
-            pass
+        if cur is not None:
+            try:
+                cur.close()
+            except Exception:
+                pass
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 @admin_bp.route("/edit-requests")
