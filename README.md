@@ -1,59 +1,77 @@
 # Dynasty Archives
 
-Dynasty Archives is a **Flask** web application for exploring historical **dynasties**, **rulers (persons)**, **reigns**, **events**, **territories**, and relationships such as succession and family ties. Data lives in **PostgreSQL**. Optional integrations add **Google Sign-In** (Firebase Auth), **SQL backups** to **Firebase Realtime Database** and **Supabase Storage**, and local image uploads.
+A **Flask** web app for exploring historical **dynasties**, **rulers**, **reigns**, **events**, **territories**, and relationships (succession, family, wars). All catalog data lives in **PostgreSQL**. The app can use **Firebase** (Google Sign-In + Realtime Database backups) and **Supabase Storage** (backup files), plus local images under `/images/`.
 
 ---
 
-## Features
+## Table of contents
 
-### Public site
-
-| Area | Description |
-|------|-------------|
-| **Home** | High-level counts and entry points. |
-| **Rulers** | List and detail with filters (dynasty, era, search, sort). |
-| **Dynasties** | List and detail with linked rulers, territories, and events. |
-| **Events** | List with optional `type` filter; detail pages. |
-| **Timeline** | Events with filters (year range, dynasty, ruler, event type). |
-| **Territories** | Regions and control timelines via dynasty–territory links. |
-| **Wars & battles** | Events limited to `war` and `battle` types. |
-| **Stats** | Aggregated insights (e.g. reigns, succession chain view). |
-| **Search** | Unified search over rulers, dynasties, events, territories. |
-
-### Accounts and roles
-
-- **Register** (`/register`) and **login** (`/login`) with username and password (stored hashed with **Werkzeug**).
-- **Google Sign-In** via Firebase (POST `/auth/google-login` with ID token); dedicated users may use a `GOOGLE_AUTH` password sentinel in the database.
-- **`admin`**: full **admin dashboard** at `/admin/` — CRUD for dynasties, persons, events; backups; edit-request review; optional full DB clear (destructive).
-- **`viewer`**: can browse the site and submit **edit suggestions** for ruler and dynasty fields (stored in `Edit_Request` for admins to approve or decline).
-
-### Admin and data management
-
-- CRUD for **Dynasty**, **Person** (optional first reign via `sp_add_ruler`), and **Event**, with optional image uploads and relationship syncing (spouses, parents/children, succession, person–event links, dynasty–territory, etc.).
-- **Backup** (`POST /admin/backup`): per-table `pg_dump` (data-only), cleaned SQL, upload to Firebase RTDB and Supabase bucket; listing and download from the admin UI.
-- **Restore** from Firebase backup metadata (multi-table or legacy format); requires admin password confirmation.
-- **Audit log** and triggers for deletes/updates where defined in schema.
-
-### Technical highlights
-
-- **SQL schema** in `sql/schema.sql`: tables, enums, indexes, triggers, views (`vw_reign_durations`, `vw_succession_chain`, `vw_wars_and_battles`, `vw_territory_timeline`), and procedures (`sp_add_ruler`, `sp_record_succession`, etc.).
-- **Images**: project-level assets under `images/` are served at **`/images/<path>`** (see `create_app` in `app/__init__.py`). Admin uploads may also write under `app/static/uploads/`.
-- **CSRF** protection via **Flask-WTF**; **rate limiting** on login via **Flask-Limiter**.
+1. [What you can do](#what-you-can-do)
+2. [What you need installed](#what-you-need-installed)
+3. [Setup from zero](#setup-from-zero) — follow in order  
+4. [Configuration reference](#configuration-reference)
+5. [First login & admin user](#first-login--admin-user)
+6. [Running & URLs](#running--urls)
+7. [Project layout](#project-layout)
+8. [Documentation & database docs](#documentation--database-docs)
+9. [Running tests](#running-tests)
+10. [Security](#security)
+11. [Troubleshooting](#troubleshooting)
+12. [Contributing](#contributing)
 
 ---
 
-## Requirements
+## What you can do
 
-- **Python** 3.11+ (3.13 is used in CI/local setups; adjust if needed).
-- **PostgreSQL** (compatible with `psycopg2` / `psycopg2-binary`).
-- **Firebase** project (web config + Realtime Database + optional service account for Admin SDK).
-- **Supabase** project (URL, service role key, storage bucket for backups — optional if you only use Firebase for backups, but the app initializes the Supabase client at startup).
+### Visitors & viewers
+
+| Page | Path | Notes |
+|------|------|--------|
+| Home | `/` | Summary stats |
+| Rulers | `/rulers` | Filters: search, dynasty, era, sort; **`?no_events=1`** = rulers with no event participation |
+| Ruler detail | `/rulers/<id>` | Reigns, family, events, succession |
+| Dynasties | `/dynasties`, `/dynasties/<id>` | Linked rulers, territories, events |
+| Events | `/events`, `/events/<id>` | Filter by **`?type=`** (war, battle, treaty, …) |
+| Timeline | `/timeline` | Year filters, dynasty, ruler, event type |
+| Territories | `/territories`, `/territories/<id>` | Control timelines |
+| Wars & battles | `/wars`, `/wars/<id>` | Only **war** / **battle** events |
+| Statistics | `/stats` | Highlights + succession chain (uses **`vw_succession_chain`**) |
+| Search | `/search` | Rulers, dynasties, events, territories |
+| Register / Login | `/register`, `/login` | Passwords stored hashed (**Werkzeug**) |
+
+**Viewers** (after login) can suggest edits to ruler/dynasty fields; suggestions go to **`Edit_Request`** for admins.
+
+### Admins (`role = admin`)
+
+| Area | Path prefix | Capabilities |
+|------|----------------|--------------|
+| Dashboard | `/admin/` | Overview, links to CRUD and backups |
+| CRUD | `/admin/dynasties`, `/admin/persons`, `/admin/events` | Create/edit/delete; optional **first reign** via stored procedure **`sp_add_ruler`** |
+| Edit requests | `/admin/edit-requests` | Approve or decline viewer suggestions |
+| Backups | `/admin/backup` (POST), `/admin/backups`, Firebase archive | **`pg_dump`** per table → Firebase RTDB + Supabase bucket (needs **`DATABASE_URL`** + CLI tools) |
+| Restore | Firebase backup UI | **Destructive**: truncates data tables then loads SQL; confirm with account password |
+| Clear DB | `/admin/clear-db` | **Very destructive** — requires typed confirmation + password |
 
 ---
 
-## Quick start
+## What you need installed
 
-### 1. Clone and virtual environment
+| Requirement | Why |
+|-------------|-----|
+| **Python 3.11+** | App & tests (3.13 works locally) |
+| **PostgreSQL** | Primary database |
+| **`psql`** (optional but useful) | Apply `sql/schema.sql` |
+| **`pg_dump`** on `PATH` | Admin **backup** button (`DATABASE_URL`) |
+| **Firebase project** | Required at startup: web API fields + Realtime DB URL; **service account JSON** for Admin SDK (backups / optional Google login server-side) |
+| **Supabase project** | App initializes client at startup — URL, **service role** key, storage **bucket** name |
+
+---
+
+## Setup from zero
+
+Work through these steps once per machine.
+
+### Step 1 — Get the code and a virtual environment
 
 ```bash
 git clone <your-repo-url> DynastyArchives
@@ -61,79 +79,159 @@ cd DynastyArchives
 python -m venv .venv
 ```
 
-**Windows (PowerShell):**
+Activate and install dependencies:
+
+**Windows (PowerShell)**
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-**macOS / Linux:**
+**macOS / Linux**
 
 ```bash
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. PostgreSQL database
+### Step 2 — Create the PostgreSQL database
 
-1. Create a database (example name: `dynasty_db`).
-2. Apply the schema:
+Create an empty database (name is up to you; examples use `dynasty_db`):
 
-   ```bash
-   psql -h localhost -U postgres -d dynasty_db -f sql/schema.sql
-   ```
-
-3. Create at least one **admin** user. Passwords must be **Werkzeug**-compatible hashes (the login route uses `check_password_hash`). Options:
-   - Use **`/register`** if enabled for your deployment, then promote the user to `admin` in SQL, or
-   - Insert/update via a small Python one-liner or admin tool using `werkzeug.security.generate_password_hash`.
-
-Example role update (after you have a `user_id`):
-
-```sql
-UPDATE user_account SET role = 'admin' WHERE username = 'yourname';
+```bash
+createdb -h localhost -U postgres dynasty_db
+# or use pgAdmin / any SQL client
 ```
 
-### 3. Environment variables and secrets folder
+Apply the schema (creates tables, enums, triggers, views, procedures):
 
-Copy `.env.example` to **`secrets/.env`** (preferred). Put your Firebase **`serviceAccountKey.json`** in **`secrets/`** as well (see `secrets/README.md`).
+```bash
+psql -h localhost -U postgres -d dynasty_db -f sql/schema.sql
+```
 
-`config.py` loads env files in order: **`secrets/.env`**, then optional legacy **`/.env`** at the repo root, then **`app/.env`**. Use **`secrets/`** as the single place for passwords and keys so they stay out of the repo (the folder is gitignored except `secrets/README.md`).
+The seed line inserts a placeholder admin row — replace its password with a real hash before relying on it (see [First login & admin user](#first-login--admin-user)).
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `DB_HOST` | Yes | PostgreSQL host. |
-| `DB_NAME` | Yes | Database name. |
-| `DB_USER` | Yes | DB user. |
-| `DB_PASSWORD` | Yes | DB password. |
-| `SECRET_KEY` | Yes | Flask session / CSRF secret; use a long random string. |
-| `DATABASE_URL` | Recommended | `postgresql://...` URL used by **pg_dump** backup/restore tooling. If omitted, some code paths may build from `DB_*`; keep this aligned with your DB. |
-| `FIREBASE_API_KEY` | Yes | Web API key (client config). |
-| `FIREBASE_AUTH_DOMAIN` | Yes | e.g. `project.firebaseapp.com`. |
-| `FIREBASE_PROJECT_ID` | Yes | Firebase project ID. |
-| `FIREBASE_DATABASE_URL` | Yes | Realtime Database URL (backups metadata). |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Yes* | Path relative to repo root, usually **`secrets/serviceAccountKey.json`** (default if unset). |
-| `SUPABASE_URL` | Yes | Supabase project URL. |
-| `SUPABASE_SERVICE_KEY` | Yes | Service role key (server-side only; never expose in the browser). |
-| `SUPABASE_BACKUP_BUCKET` | Yes | Storage bucket name for SQL backup files. |
+### Step 3 — Secrets and environment variables
 
-The entire **`secrets/`** directory (except its README) is listed in **`.gitignore`**.
+1. Copy **`.env.example`** to **`secrets/.env`** (create the `secrets` folder if needed).
+2. Download your Firebase **service account** JSON from the Firebase console → Project settings → Service accounts → Generate new private key.
+3. Save it as **`secrets/serviceAccountKey.json`** (or another path and set **`FIREBASE_SERVICE_ACCOUNT_JSON`** accordingly).
 
-### 4. Supabase storage
+Fill **`secrets/.env`** with real values. Minimum:
 
-Create a **bucket** matching `SUPABASE_BACKUP_BUCKET`. The admin backup flow uploads `.sql` files into timestamped folders.
+- **`DB_HOST`**, **`DB_NAME`**, **`DB_USER`**, **`DB_PASSWORD`** — match the database you created.
+- **`SECRET_KEY`** — long random string (sessions & CSRF).
+- All **`FIREBASE_*`** and **`SUPABASE_*`** variables listed in [.env.example](.env.example).
 
-### 5. Run the application
+**`DATABASE_URL`** for backups should be a proper libpq URL, for example:
 
-From the repo root:
+```text
+postgresql://USER:PASSWORD@HOST:5432/dynasty_db
+```
+
+Use URL-encoding for special characters in the password (or set password without special chars for local dev).
+
+Load order (first file wins per variable if not already in the OS environment):
+
+1. **`secrets/.env`**
+2. **`.env`** at repo root (optional legacy)
+3. **`app/.env`** (optional legacy)
+
+See **`secrets/README.md`** for details.
+
+### Step 4 — Supabase storage bucket
+
+In the Supabase dashboard → Storage, create a bucket whose name matches **`SUPABASE_BACKUP_BUCKET`** (e.g. `dynasty-backups`). The backup job uploads `.sql` files there.
+
+### Step 5 — Run the app
+
+From the repository root:
 
 ```bash
 python run.py
 ```
 
-Default in `run.py`: **debug** mode, port **5000** — open `http://127.0.0.1:5000`.
+Open **http://127.0.0.1:5000** — default is **debug** on port **5000**.
 
-**Production:** use a WSGI server (e.g. Gunicorn, Waitress), set `debug=False`, and configure HTTPS and secrets via the environment (not committed files).
+---
+
+## Configuration reference
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Yes | PostgreSQL connection (`config.Config`). |
+| `SECRET_KEY` | Yes | Flask sessions and CSRF. |
+| `DATABASE_URL` | Strongly recommended | **`pg_dump`** / restore URL; must match your DB for backups to work. |
+| `FIREBASE_API_KEY` | Yes | Client/web config. |
+| `FIREBASE_AUTH_DOMAIN` | Yes | e.g. `your-project.firebaseapp.com`. |
+| `FIREBASE_PROJECT_ID` | Yes | Firebase project ID. |
+| `FIREBASE_DATABASE_URL` | Yes | Realtime Database URL (backup metadata). |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Yes* | Path from repo root; default **`secrets/serviceAccountKey.json`**. |
+| `SUPABASE_URL` | Yes | Supabase project URL. |
+| `SUPABASE_SERVICE_KEY` | Yes | Service role key — **server only**, never commit. |
+| `SUPABASE_BACKUP_BUCKET` | Yes | Storage bucket name for SQL backup files. |
+
+\*The app imports Firebase Admin using this file path.
+
+---
+
+## First login & admin user
+
+Passwords in **`User_Account`** must be **Werkzeug** hashes (`generate_password_hash` / `check_password_hash`).
+
+**Option A — Register then promote (if `/register` is enabled)**
+
+1. Register at **`/register`**.
+2. In PostgreSQL:
+
+```sql
+UPDATE user_account SET role = 'admin' WHERE username = 'your_username';
+```
+
+**Option B — Insert or update with Python** (run from repo root with venv activated):
+
+```python
+from werkzeug.security import generate_password_hash
+hash = generate_password_hash("YourSecurePassword123")
+print(hash)
+```
+
+Paste the hash into SQL:
+
+```sql
+INSERT INTO user_account (username, password, role, email, is_active)
+VALUES ('admin', '<paste_hash_here>', 'admin', 'you@example.com', TRUE);
+```
+
+Or update the seeded `admin` user from `schema.sql` (replace `CHANGE_ME_TO_BCRYPT_HASH`).
+
+**Roles**
+
+- **`admin`** → after login, redirect to **`/admin/`**.
+- **`viewer`** → redirect to **`/`**.
+
+**Note:** `login_manager.login_view` in **`app/__init__.py`** may still say `admin.login` while the real route is **`auth.login`**. If admin pages do not send you to `/login`, set `login_manager.login_view = "auth.login"` in `create_app`.
+
+---
+
+## Running & URLs
+
+| Environment | Command | URL |
+|-------------|---------|-----|
+| Development | `python run.py` | http://127.0.0.1:5000 |
+
+**Production:** run behind a production WSGI server (e.g. Gunicorn, Waitress), `debug=False`, HTTPS, and inject secrets via the environment — never rely on committed files.
+
+### Quick route map
+
+| Audience | Prefix | Examples |
+|----------|--------|----------|
+| Public | *(none)* | `/`, `/dynasties`, `/events`, `/timeline` |
+| Auth | | `/login`, `/logout`, `/register` |
+| Admin | `/admin` | `/admin/`, `/admin/dynasties`, `/admin/persons`, `/admin/events` |
+
+Static images from the repo **`images/`** folder are served at **`/images/<path>`**.
 
 ---
 
@@ -142,78 +240,94 @@ Default in `run.py`: **debug** mode, port **5000** — open `http://127.0.0.1:50
 ```
 DynastyArchives/
 ├── app/
-│   ├── __init__.py       # create_app(), login, /images route, CSRF
-│   ├── db.py             # PostgreSQL helpers (execute_query, audit)
-│   ├── firebase.py       # Firebase Admin / RTDB helpers
-│   ├── supabase_client.py
-│   ├── uploads.py        # Local image save helpers
+│   ├── __init__.py          # Flask app, CSRF, login, /images
+│   ├── db.py                # execute_query, connections
+│   ├── firebase.py          # Firebase Admin / RTDB
+│   ├── supabase_client.py   # Supabase client & backup bucket
+│   ├── uploads.py           # Admin image saves
 │   ├── routes/
-│   │   ├── user.py       # Public blueprint (no URL prefix)
-│   │   ├── admin.py      # /admin blueprint
-│   │   └── auth.py       # login, register, Google, logout
-│   ├── templates/        # Jinja2 HTML
-│   └── static/           # Static assets + optional uploads subtree
-├── config.py             # Config dataclass; loads secrets/.env then legacy .env paths
-├── secrets/              # Local-only: .env, serviceAccountKey.json (gitignored; see secrets/README.md)
-├── images/               # Canonical image tree served at /images/
+│   │   ├── user.py          # Public pages
+│   │   ├── admin.py         # Admin CRUD, backup, restore
+│   │   └── auth.py          # Login, register, Google, logout
+│   ├── templates/
+│   └── static/
+├── config.py                # Loads secrets/.env then legacy .env paths
+├── secrets/                 # Local only — .env, serviceAccountKey.json (see secrets/README.md)
+├── images/                  # Served at /images/
 ├── sql/
-│   └── schema.sql        # Full PostgreSQL DDL + seeds (adjust seed user)
-├── tests/                # pytest suite (see below)
-├── run.py                # Dev entrypoint
+│   └── schema.sql           # Full DDL: enums, triggers, views, procedures
+├── tests/                   # pytest (real PostgreSQL)
+├── run.py
 ├── requirements.txt
 ├── .env.example
-└── README.md
+├── README.md
+├── database-schema-diagram.md
+├── erd-explanation.md
+└── erd-complete-advanced.md
 ```
 
 ---
 
-## Authentication notes
+## Documentation & database docs
 
-- After login, **`admin`** users are redirected to **`/admin/`** (dashboard); **`viewer`** users to **`/`**.
-- **`login_manager.login_view`** is currently set to **`admin.login`** in `app/__init__.py`. The actual login endpoint lives on the **`auth`** blueprint as **`auth.login`**. If unauthenticated access to admin routes does not redirect to `/login` as expected, set `login_manager.login_view = "auth.login"` (or add a named route alias) so Flask-Login resolves the correct URL.
+| File | Contents |
+|------|----------|
+| **`sql/schema.sql`** | Source of truth for tables, constraints, triggers, views, procedures |
+| **`database-schema-diagram.md`** | Tables, columns, FK arrows, Mermaid diagram |
+| **`erd-explanation.md`** | Conceptual ER: cardinality, participation, weak entities |
+| **`erd-complete-advanced.md`** | Chen-style hand-draw guide |
 
 ---
 
-## Testing
+## Running tests
 
-The **`tests/`** directory contains a **pytest** suite that exercises the app against a **real PostgreSQL** instance (same `DB_*` / `DATABASE_URL` as your environment). External services (**Firebase**, **Supabase**, Google Admin init) are **mocked** in `tests/conftest.py` so imports succeed without live keys.
+Tests use a **real PostgreSQL** database (same **`DB_*`** / **`DATABASE_URL`** as your env). Firebase and Supabase clients are **mocked** in **`tests/conftest.py`** so tests run without live cloud keys.
 
 ```bash
 pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
 
-Tests create temporary **`User_Account`** rows and clean them up; many tests also insert/delete dynasties, persons, or events with unique names. **Do not** point tests at a production database unless you accept that risk.
+**Important**
 
-Firebase **restore** runs **TRUNCATE**, replay **INSERT**s, **`INSERT` into `Audit_Log`**, and **`commit`** on one connection — so if anything fails before commit, **nothing** from that restore (including the audit row) persists. **Restore tests** intentionally **mock** the raw `psycopg2.connect` used only for restore’s positional DSN URL so the suite does not `TRUNCATE` your database. A full manual restore from the admin UI **will** wipe and reload data per the implementation — use only on backups you trust and environments you can afford to reset.
+- Tests insert/delete test rows (including temporary users). Use a **dev database**, not production.
+- Restore-related tests **mock** `psycopg2.connect` for the restore URL so your DB is not truncated. A **manual restore** from the admin UI still **wipes** configured tables — only use trusted backups and disposable environments.
+
+Firebase restore runs **TRUNCATE**, replay **INSERT**s, **`Audit_Log`** insert, and a single **`commit`** on one connection — if anything fails before commit, **nothing** from that restore persists.
 
 ---
 
-## Security checklist
+## Security
 
-- Never commit **`secrets/.env`**, **`secrets/*.json`**, root **`.env`**, **`app/.env`**, or **Supabase service keys**. Confirm **`secrets/`** stays ignored except **`secrets/README.md`**.
-- Keep **`SECRET_KEY`** strong and unique per environment.
-- Restrict **`SUPABASE_SERVICE_KEY`** to server-side code only.
-- Admin actions (**backup**, **restore**, **clear database**) are destructive or sensitive; protect admin accounts and use HTTPS in production.
-- Login is rate-limited; review **Flask-Limiter** storage for multi-worker deployments.
+- Never commit **`secrets/.env`**, **`secrets/*.json`**, root **`.env`**, **`app/.env`**, or keys in screenshots.
+- Rotate **`SECRET_KEY`** if it leaks.
+- **`SUPABASE_SERVICE_KEY`** and Firebase service account JSON are **server secrets** only.
+- Protect **admin** accounts; backup / restore / clear-db are high-impact.
+- Login is **rate-limited**; for multiple workers configure Flask-Limiter storage appropriately.
 
 ---
 
 ## Troubleshooting
 
-| Issue | Suggestions |
-|--------|-------------|
-| `RuntimeError` about Firebase env vars | Set all four: `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_DATABASE_URL`. |
-| DB connection errors | Verify `DB_*` and that PostgreSQL accepts TCP connections from your host. |
-| Backup fails on `pg_dump` | Ensure **`DATABASE_URL`** is set and `pg_dump` is on `PATH`; URL must include host, user, and database name. |
-| Images 404 | Use paths under `images/` or URLs your browser can reach; admin normalizes some paths to `/images/...`. |
-| CSRF errors on forms | Ensure templates include `csrf_token()`; for API-style tests, disable CSRF in test config (see `tests/conftest.py`). |
+| Symptom | What to check |
+|---------|----------------|
+| `RuntimeError` about Firebase env vars | All four must be set: `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_DATABASE_URL`. |
+| Cannot connect to PostgreSQL | `DB_*`, firewall, `pg_hba.conf`, database exists. |
+| Backup fails | **`DATABASE_URL`** set correctly; **`pg_dump`** on PATH; user can connect to that database. |
+| Images 404 | Paths under **`images/`** or URLs that resolve; admin may normalize to **`/images/...`**. |
+| CSRF errors on POST | Forms include **`csrf_token()`**; tests use `WTF_CSRF_ENABLED=False` in **`tests/conftest.py`**. |
+| Admin redirect not to `/login` | Set **`login_manager.login_view = "auth.login"`** (see [First login](#first-login--admin-user)). |
 
 ---
 
-
 ## Contributing
 
-1. Use a feature branch and keep commits focused.
-2. Run **`python -m pytest tests/ -v`** before opening a PR when DB-backed behavior changes.
-3. Update **`sql/schema.sql`** and this **README** when you add migrations, env vars, or major features.
+1. Use a focused branch and clear commits.
+2. Run **`python -m pytest tests/ -v`** after DB-related changes.
+3. Update **`sql/schema.sql`** and this README when you add migrations, env vars, or major behavior.
+
+---
+
+## License
+
+Add your license here (e.g. MIT) or your course attribution if required.
