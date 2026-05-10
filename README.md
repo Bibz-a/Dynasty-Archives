@@ -1,6 +1,16 @@
 # Dynasty Archives
 
-A **Flask** web app for exploring historical **dynasties**, **rulers**, **reigns**, **events**, **territories**, and relationships (succession, family, wars). All catalog data lives in **PostgreSQL**. The app can use **Firebase** (Google Sign-In + Realtime Database backups) and **Supabase Storage** (backup files), plus local images under `/images/`.
+**Dynasty Archives** is a small, opinionated history catalog: browse dynasties and the people who ruled them, trace events on a timeline, map territories to empires, and (if you’re an admin) curate the database behind it. The stack is familiar—**Flask**, **PostgreSQL**, **Jinja** templates—with **Firebase** (Realtime Database + optional Google Sign-In) and **Supabase Storage** for backup files, plus a deliberate split between repo-root **`images/`** and admin uploads.
+
+Whether you’re demoing a course project or extending the schema, this README walks you from empty clone to a running app, then calls out **known limitations** (especially around images and paths) so you don’t chase ghosts.
+
+---
+
+## Why this project?
+
+- **Structured history**: Reigns, successions, wars, and family links are first-class data—not just prose pages.
+- **Real database design**: Enums, triggers, views, stored procedures, and audit logging live in **`sql/schema.sql`** (see also **`erd-explanation.md`**).
+- **Two audiences**: Public readers get search and filters; **admins** get CRUD, backups, and a workflow for viewer-submitted corrections.
 
 ---
 
@@ -8,16 +18,19 @@ A **Flask** web app for exploring historical **dynasties**, **rulers**, **reigns
 
 1. [What you can do](#what-you-can-do)
 2. [What you need installed](#what-you-need-installed)
-3. [Setup from zero](#setup-from-zero) — follow in order  
+3. [Setup from zero](#setup-from-zero) — follow in order
 4. [Configuration reference](#configuration-reference)
 5. [First login & admin user](#first-login--admin-user)
 6. [Running & URLs](#running--urls)
-7. [Project layout](#project-layout)
-8. [Documentation & database docs](#documentation--database-docs)
-9. [Running tests](#running-tests)
-10. [Security](#security)
-11. [Troubleshooting](#troubleshooting)
-12. [Contributing](#contributing)
+7. [Images & static assets](#images--static-assets)
+8. [Project layout](#project-layout)
+9. [Documentation & database docs](#documentation--database-docs)
+10. [Running tests](#running-tests)
+11. [Security](#security)
+12. [Troubleshooting](#troubleshooting)
+13. [Known limitations & improvements](#known-limitations--improvements)
+14. [Contributing](#contributing)
+15. [License](#license)
 
 ---
 
@@ -35,22 +48,22 @@ A **Flask** web app for exploring historical **dynasties**, **rulers**, **reigns
 | Timeline | `/timeline` | Year filters, dynasty, ruler, event type |
 | Territories | `/territories`, `/territories/<id>` | Control timelines |
 | Wars & battles | `/wars`, `/wars/<id>` | Only **war** / **battle** events |
-| Statistics | `/stats` | Highlights + succession chain (uses **`vw_succession_chain`**) |
+| Statistics | `/stats` | Highlights + succession chain (reads **`vw_succession_chain`**) |
 | Search | `/search` | Rulers, dynasties, events, territories |
 | Register / Login | `/register`, `/login` | Passwords stored hashed (**Werkzeug**) |
 
-**Viewers** (after login) can suggest edits to ruler/dynasty fields; suggestions go to **`Edit_Request`** for admins.
+**Viewers** (after login) can suggest edits to ruler/dynasty fields; suggestions land in **`Edit_Request`** for admins to approve or decline.
 
 ### Admins (`role = admin`)
 
 | Area | Path prefix | Capabilities |
-|------|----------------|--------------|
-| Dashboard | `/admin/` | Overview, links to CRUD and backups |
-| CRUD | `/admin/dynasties`, `/admin/persons`, `/admin/events` | Create/edit/delete; optional **first reign** via stored procedure **`sp_add_ruler`** |
+|------|-------------|----------------|
+| Dashboard | `/admin/` | Overview, backup shortcuts, recent activity |
+| CRUD | `/admin/dynasties`, `/admin/persons`, `/admin/events` | Create/edit/delete; optional first reign via **`sp_add_ruler`** |
 | Edit requests | `/admin/edit-requests` | Approve or decline viewer suggestions |
-| Backups | `/admin/backup` (POST), `/admin/backups`, Firebase archive | **`pg_dump`** per table → Firebase RTDB + Supabase bucket (needs **`DATABASE_URL`** + CLI tools) |
-| Restore | Firebase backup UI | **Destructive**: truncates data tables then loads SQL; confirm with account password |
-| Clear DB | `/admin/clear-db` | **Very destructive** — requires typed confirmation + password |
+| Backups | `POST /admin/backup`, `/admin/backups`, `/admin/backups/firebase` | Per-table **`pg_dump`** → Firebase RTDB + Supabase (needs **`DATABASE_URL`** + **`pg_dump`**) |
+| Restore | Firebase backup UI | **Destructive**: truncates data tables then loads SQL; password confirmation |
+| Clear DB | `/admin/clear-db` | **Very destructive** — typed confirmation + password |
 
 ---
 
@@ -60,10 +73,10 @@ A **Flask** web app for exploring historical **dynasties**, **rulers**, **reigns
 |-------------|-----|
 | **Python 3.11+** | App & tests (3.13 works locally) |
 | **PostgreSQL** | Primary database |
-| **`psql`** (optional but useful) | Apply `sql/schema.sql` |
-| **`pg_dump`** on `PATH` | Admin **backup** button (`DATABASE_URL`) |
-| **Firebase project** | Required at startup: web API fields + Realtime DB URL; **service account JSON** for Admin SDK (backups / optional Google login server-side) |
-| **Supabase project** | App initializes client at startup — URL, **service role** key, storage **bucket** name |
+| **`psql`** (optional but useful) | Apply **`sql/schema.sql`** |
+| **`pg_dump`** on `PATH` | Admin **Backup Database** button |
+| **Firebase project** | Startup requires web config + Realtime DB URL; **service account JSON** for Admin SDK |
+| **Supabase project** | App initializes client at startup — URL, **service role** key, storage **bucket** |
 
 ---
 
@@ -130,7 +143,7 @@ Fill **`secrets/.env`** with real values. Minimum:
 postgresql://USER:PASSWORD@HOST:5432/dynasty_db
 ```
 
-Use URL-encoding for special characters in the password (or set password without special chars for local dev).
+Use URL-encoding for special characters in the password (or set a password without special chars for local dev).
 
 Load order (first file wins per variable if not already in the OS environment):
 
@@ -231,7 +244,27 @@ Or update the seeded `admin` user from `schema.sql` (replace `CHANGE_ME_TO_BCRYP
 | Auth | | `/login`, `/logout`, `/register` |
 | Admin | `/admin` | `/admin/`, `/admin/dynasties`, `/admin/persons`, `/admin/events` |
 
-Static images from the repo **`images/`** folder are served at **`/images/<path>`**.
+Repo-root **`images/`** is served at **`/images/<path>`** (see [Images & static assets](#images--static-assets)).
+
+---
+
+## Images & static assets
+
+Understanding where images live saves a lot of “broken portrait” debugging.
+
+| Source | How it’s served | Typical use |
+|--------|-----------------|-------------|
+| **`images/`** (repo root) | Flask route **`/images/<path>`** in **`app/__init__.py`** | Curated assets checked into git; seeds and templates often reference **`/images/persons/...`** etc. |
+| **Admin uploads** | **`app/uploads.py`** (`save_image_local_path`) writes under **`images/<folder>/`**, returns a **`/images/...`** URL; also mirrors into **`app/static/images/...`** as a backup copy | New ruler/dynasty/event images from the admin UI |
+| **External URLs** | Stored as-is in the DB (`http...` or `data:...`) | Hotlinking or pasted URLs; no local file required |
+
+**Normalization in admin** (`_normalize_local_image_path` in **`app/routes/admin.py`**): accepts `https://`, `data:`, paths starting with **`/images/`**, or bare filenames (resolved under the appropriate **`images/`** subfolder). Mismatched folder names in the database (e.g. typo **`dyansties`** vs **`dynasties`**) or missing files under **`images/`** will still produce **404** in the browser even though the app is “correct.”
+
+**Practical tips**
+
+- Prefer consistent path prefixes: **`/images/<category>/<file>`** for anything meant to be local.
+- After clone, if **`images/`** is empty or gitignored locally, expect broken thumbnails until you restore assets or re-upload.
+- **`app/static/uploads/`** may contain legacy or one-off uploads; not all templates may point there—check the actual `image_url` value in PostgreSQL when something doesn’t render.
 
 ---
 
@@ -240,11 +273,11 @@ Static images from the repo **`images/`** folder are served at **`/images/<path>
 ```
 DynastyArchives/
 ├── app/
-│   ├── __init__.py          # Flask app, CSRF, login, /images
+│   ├── __init__.py          # Flask app, CSRF, login, /images route
 │   ├── db.py                # execute_query, connections
 │   ├── firebase.py          # Firebase Admin / RTDB
 │   ├── supabase_client.py   # Supabase client & backup bucket
-│   ├── uploads.py           # Admin image saves
+│   ├── uploads.py           # Admin image saves (images/ + static mirror)
 │   ├── routes/
 │   │   ├── user.py          # Public pages
 │   │   ├── admin.py         # Admin CRUD, backup, restore
@@ -314,9 +347,43 @@ Firebase restore runs **TRUNCATE**, replay **INSERT**s, **`Audit_Log`** insert, 
 | `RuntimeError` about Firebase env vars | All four must be set: `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_DATABASE_URL`. |
 | Cannot connect to PostgreSQL | `DB_*`, firewall, `pg_hba.conf`, database exists. |
 | Backup fails | **`DATABASE_URL`** set correctly; **`pg_dump`** on PATH; user can connect to that database. |
-| Images 404 | Paths under **`images/`** or URLs that resolve; admin may normalize to **`/images/...`**. |
+| Images 404 | File exists under **`images/`**; DB path matches (**`/images/...`**); no typos in folder names; see [Images & static assets](#images--static-assets). |
 | CSRF errors on POST | Forms include **`csrf_token()`**; tests use `WTF_CSRF_ENABLED=False` in **`tests/conftest.py`**. |
 | Admin redirect not to `/login` | Set **`login_manager.login_view = "auth.login"`** (see [First login](#first-login--admin-user)). |
+
+---
+
+## Known limitations & improvements
+
+This section is intentionally honest: it describes rough edges in the current codebase and sensible next steps if you fork or extend the project.
+
+### Images and paths
+
+- **Two physical locations**: Primary serving is **`/images/`** → repo **`images/`**; uploads also copy to **`app/static/images/`**. Templates and DB values may not always agree on which convention was used historically—when in doubt, inspect **`image_url`** in SQL.
+- **Typos and legacy folders**: Some seeds or assets use nonstandard directory spellings (e.g. **`dyansties`**). Those paths work only if the matching folder exists; standardizing names would reduce confusion.
+- **Missing assets after clone**: Large **`images/`** trees may be omitted from a clone (`.gitignore`, LFS, or manual curation). Broken images are often “data/env” issues, not Flask routing.
+- **External-only images**: Rows that store full `https://` URLs depend on third-party availability and hotlinking policies; there is no automatic mirror to local storage.
+
+### Auth and admin UX
+
+- **`login_view` mismatch**: If `login_manager.login_view` still points at **`admin.login`** while login lives under **`auth.login`**, unauthenticated visits to admin may not redirect cleanly—aligning the blueprint name fixes it (see [First login](#first-login--admin-user)).
+- **Role gates**: Ensure production **`User_Account.role`** values match what **`@role_required`** expects (`admin` vs `viewer`).
+
+### Database and schema
+
+- **`Edit_Request` polymorphism**: Suggestions reference ruler or dynasty (and related fields) in a flexible way; there may be no single FK graph that enforces “this row still exists” at the database level—application logic handles resolution; DB-level constraints could be tightened in a future migration.
+- **Views vs templates**: **`vw_succession_chain`** is used on the stats page; other views in **`schema.sql`** (e.g. reign-duration helpers) might be duplicated or partially inlined in Python—consolidating on views or documenting “template uses X only” would clarify intent.
+
+### Backups and restore
+
+- **Operational deps**: Backups require **`pg_dump`** and a valid **`DATABASE_URL`**; CI or minimal containers without PostgreSQL client tools will not be able to run the same path as your laptop.
+- **Restore is destructive**: Truncates configured tables before load; always verify backup provenance and use a disposable database when experimenting.
+- **Cloud vs local parity**: Firebase RTDB and Supabase hold **snapshots**; they are not a substitute for migration discipline or versioned **`schema.sql`** unless you treat dumps as the source of truth on purpose.
+
+### General polish
+
+- **Rate limiting storage**: Default in-memory limiter is fine for a single process; multiple Gunicorn workers need shared storage (e.g. Redis) for consistent limits.
+- **Production checklist**: HTTPS, `debug=False`, secret injection, and log aggregation are left to the deployer—this repo optimizes for clarity in development.
 
 ---
 
