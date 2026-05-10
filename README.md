@@ -392,9 +392,3 @@ This section is intentionally honest: it describes rough edges in the current co
 1. Use a focused branch and clear commits.
 2. Run **`python -m pytest tests/ -v`** after DB-related changes.
 3. Update **`sql/schema.sql`** and this README when you add migrations, env vars, or major behavior.
-
----
-
-## License
-
-Add your license here (e.g. MIT) or your course attribution if required.
