@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ war[1] }} • Wars{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('user.wars') }}">Back to wars</a>
+    <article class="card">
+      <div class="card-body">
+        <h1>{{ war[1] }}</h1>
+        <div class="cluster">
+          <span class="badge text-bg-warning">{{ war[2] }}</span>
+          <span class="muted small">{{ war[3] or '' }}{% if war[4] %} - {{ war[4] }}{% endif %}</span>
+          <span class="muted small">{{ war[5] or '' }}</span>
+          {% if war[8] %}<span class="badge text-bg-secondary">{{ war[8] }}</span>{% endif %}
+        </div>
+        <p class="muted" style="margin-top:.7rem;">{{ war[6] or 'No description available.' }}</p>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-body">
+        <h2>Recorded participants</h2>
+        <hr class="section-rule">
+        {% if participants %}
+          <table class="detail-table">
+            <thead><tr><th>Name</th><th>Role</th></tr></thead>
+            <tbody>
+              {% for p in participants %}
+                <tr>
+                  <td><a href="{{ url_for('user.ruler_detail', person_id=p[0]) }}">{{ p[1] }}</a></td>
+                  <td class="muted">{{ p[2] or '' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted">No participants recorded.</p>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-body">
+        <h2>Related Battles</h2>
+        <hr class="section-rule">
+        {% if related_battles %}
+          <table class="detail-table">
+            <thead><tr><th>Name</th><th>Date</th><th>Location</th></tr></thead>
+            <tbody>
+              {% for b in related_battles %}
+                <tr>
+                  <td><a href="{{ url_for('user.war_detail', event_id=b[0]) }}">{{ b[1] }}</a></td>
+                  <td>{{ b[2] or '' }}{% if b[3] %} - {{ b[3] }}{% endif %}</td>
+                  <td class="muted">{{ b[4] or '' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted">No related battles found.</p>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+{% endblock %}

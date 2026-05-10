@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Clear Database • Admin{% endblock %}
+
+{% block content %}
+  <section style="display:grid; place-items:center; min-height:70vh;">
+    <article class="card" style="width:min(680px, 100%); border-color:rgba(209,92,92,.45);">
+      <div class="card-body">
+        <div style="font-size:2rem; color:#d15c5c; margin-bottom:.4rem;">⚠</div>
+        <h1 style="color:#f2d7d7;">Clear Entire Database</h1>
+        <p class="muted" style="margin-top:.6rem;">
+          This will delete all dynasties, rulers, reigns, events, territories, successions, family relations,
+          edit requests, and audit logs. User accounts will <strong>NOT</strong> be deleted.
+        </p>
+        <p style="color:#e39b9b; margin:.3rem 0 1rem;">This action is permanent and cannot be undone.</p>
+        <hr class="section-rule" style="border-top-color:rgba(209,92,92,.35);">
+
+        <form method="post" action="{{ url_for('admin.clear_db_confirm') }}" class="stack">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div>
+            <label class="form-label">Type "DELETE EVERYTHING" to confirm</label>
+            <input id="confirm-text" class="form-control" type="text" name="confirm_text" placeholder="DELETE EVERYTHING" autocomplete="off" required>
+          </div>
+          <div>
+            <label class="form-label">Enter your admin password</label>
+            <input class="form-control" type="password" name="password" required autocomplete="current-password">
+          </div>
+          <div class="cluster">
+            <a class="btn btn-outline-light" href="{{ url_for('admin.dashboard') }}">Cancel</a>
+            <button id="clear-submit" class="btn" type="submit" disabled style="background:#b04040; border-color:#b04040; color:#fff;">Clear Database</button>
+          </div>
+        </form>
+      </div>
+    </article>
+  </section>
+
+  <script>
+    (function () {
+      const input = document.getElementById("confirm-text");
+      const submit = document.getElementById("clear-submit");
+      if (!input || !submit) return;
+      const sync = () => {
+        submit.disabled = input.value !== "DELETE EVERYTHING";
+        submit.style.opacity = submit.disabled ? "0.55" : "1";
+      };
+      input.addEventListener("input", sync);
+      sync();
+    })();
+  </script>
+{% endblock %}

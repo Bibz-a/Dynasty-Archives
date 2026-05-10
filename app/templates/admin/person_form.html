@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == 'add' %}Add Person{% else %}Edit Person{% endif %} • Admin{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+      <div class="card">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <h1 class="h4 mb-0">{% if mode == 'add' %}Add Person (Ruler){% else %}Edit Person{% endif %}</h1>
+            <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin.persons_list') }}">Back</a>
+          </div>
+
+          <form method="post" class="row g-3 mt-1" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Full name</label>
+              <input class="form-control" name="full_name" required value="{{ person[1] if person else '' }}">
+            </div>
+
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Dynasty</label>
+              <select class="form-select" name="dynasty_id" required>
+                <option value="">Select dynasty...</option>
+                {% for d in dynasties %}
+                  {% set selected = (person and person[6] == d[0]) %}
+                  <option value="{{ d[0] }}" {% if selected %}selected{% endif %}>{{ d[1] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-6 col-lg-3">
+              <label class="form-label">Birth date</label>
+              <input class="form-control" type="date" name="birth_date" value="{{ person[2] if person and person[2] else '' }}">
+            </div>
+            <div class="col-6 col-lg-3">
+              <label class="form-label">Death date</label>
+              <input class="form-control" type="date" name="death_date" value="{{ person[3] if person and person[3] else '' }}">
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Image URL</label>
+              <input id="image_url" class="form-control" name="image_url" value="{{ person[5] if person else '' }}" placeholder="/images/persons/example.jpg">
+            </div>
+
+            <div class="col-12">
+              {% if person and person[5] %}
+                <div class="mb-2">
+                  <div class="muted small mb-1">Current image</div>
+                  {% set img_src = person[5] %}
+                  {% if not (img_src.startswith('http://') or img_src.startswith('https://') or img_src.startswith('/images/')) %}
+                    {% set img_src = url_for('project_images', filename=img_src) %}
+                  {% endif %}
+                  <img src="{{ img_src }}" alt="Current image" class="rounded border" style="max-width: 220px; height: auto;">
+                </div>
+              {% endif %}
+              <label class="form-label">Upload new image</label>
+              <input id="image_file" class="form-control" type="file" name="image_file" accept="image/jpeg,image/png,image/webp">
+              <small>Max 2MB. Use local paths like /images/persons/file.jpg. Selecting a file will auto-fill local path format.</small>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Biography</label>
+              <textarea class="form-control" rows="5" name="biography">{{ person[4] if person else '' }}</textarea>
+            </div>
+
+            <div class="col-12">
+              <hr>
+              <h2 class="h6 mb-2">Optional relationships and participation</h2>
+              <p class="muted small mb-3">Select any that apply. Leave empty to skip.</p>
+            </div>
+
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Spouses</label>
+              <select class="form-select" name="spouse_ids" multiple size="6">
+                {% for p in people %}
+                  {% if not person or p[0] != person[0] %}
+                    <option value="{{ p[0] }}" {% if p[0] in selected_spouse_ids %}selected{% endif %}>{{ p[1] }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Children</label>
+              <select class="form-select" name="child_ids" multiple size="6">
+                {% for p in people %}
+                  {% if not person or p[0] != person[0] %}
+                    <option value="{{ p[0] }}" {% if p[0] in selected_child_ids %}selected{% endif %}>{{ p[1] }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Parents</label>
+              <select class="form-select" name="parent_ids" multiple size="6">
+                {% for p in people %}
+                  {% if not person or p[0] != person[0] %}
+                    <option value="{{ p[0] }}" {% if p[0] in selected_parent_ids %}selected{% endif %}>{{ p[1] }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Events participated in</label>
+              <select class="form-select" name="event_ids" multiple size="6">
+                {% for e in events %}
+                  <option value="{{ e[0] }}" {% if e[0] in selected_event_ids %}selected{% endif %}>{{ e[1] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Succeeded after (predecessors)</label>
+              <select class="form-select" name="predecessor_ids" multiple size="6">
+                {% for p in people %}
+                  {% if not person or p[0] != person[0] %}
+                    <option value="{{ p[0] }}" {% if p[0] in selected_predecessor_ids %}selected{% endif %}>{{ p[1] }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Succeeded by (successors)</label>
+              <select class="form-select" name="successor_ids" multiple size="6">
+                {% for p in people %}
+                  {% if not person or p[0] != person[0] %}
+                    <option value="{{ p[0] }}" {% if p[0] in selected_successor_ids %}selected{% endif %}>{{ p[1] }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+
+            {% if mode == 'add' %}
+              <div class="col-12">
+                <hr>
+                <h2 class="h6 mb-2">Optional: first reign (uses stored procedure)</h2>
+                <p class="muted small mb-3">Fill at least <strong>Title</strong> and <strong>Start date</strong> to create the person + first reign together.</p>
+              </div>
+
+              <div class="col-12 col-lg-4">
+                <label class="form-label">Title</label>
+                <input class="form-control" name="title" placeholder="e.g. Emperor">
+              </div>
+              <div class="col-12 col-lg-4">
+                <label class="form-label">Capital</label>
+                <input class="form-control" name="capital" placeholder="e.g. Chang'an">
+              </div>
+              <div class="col-6 col-lg-2">
+                <label class="form-label">Start date</label>
+                <input class="form-control" type="date" name="start_date">
+              </div>
+              <div class="col-6 col-lg-2">
+                <label class="form-label">End date</label>
+                <input class="form-control" type="date" name="end_date">
+              </div>
+            {% endif %}
+
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-light" type="submit">{% if mode == 'add' %}Create{% else %}Save changes{% endif %}</button>
+              <a class="btn btn-outline-light" href="{{ url_for('admin.persons_list') }}">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const fileInput = document.getElementById("image_file");
+      const urlInput = document.getElementById("image_url");
+      if (!fileInput || !urlInput) return;
+      fileInput.addEventListener("change", function () {
+        const f = fileInput.files && fileInput.files[0];
+        if (!f) return;
+        const safe = f.name.toLowerCase().replace(/\s+/g, "_");
+        urlInput.value = "/images/persons/" + safe;
+      });
+    })();
+  </script>
+{% endblock %}
+

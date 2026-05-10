@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}{{ person[1] }} • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <div class="stack">
+    <div class="cluster">
+      <a class="btn btn-outline-light btn-sm" href="{{ url_for('user.rulers') }}">Back to rulers</a>
+      {% if current_user.is_authenticated %}
+        <a href="{{ url_for('user.suggest_ruler_edit', person_id=person[0]) }}" class="btn btn-outline-light btn-sm">
+          Suggest an edit
+        </a>
+      {% else %}
+        <span class="suggest-locked">
+          <i class="ti ti-lock" aria-hidden="true">🔒</i>
+          Only registered users can suggest edits -
+          <a href="{{ url_for('auth.login') }}">log in</a>
+          or <a href="{{ url_for('auth.register') }}">register</a>
+        </span>
+      {% endif %}
+    </div>
+
+    <section class="detail-layout">
+      <aside class="card">
+        <div class="card-body">
+          {% if person[5] %}
+            {% set img_src = person[5] %}
+            {% if not (img_src.startswith('http://') or img_src.startswith('https://') or img_src.startswith('/images/')) %}
+              {% set img_src = url_for('project_images', filename=img_src) %}
+            {% endif %}
+            <img src="{{ img_src }}" alt="{{ person[1] }}" style="width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:8px;">
+          {% else %}
+            <div class="img-placeholder">
+              <span>{{ (person[1] or 'R')[0] | upper }}</span>
+            </div>
+          {% endif %}
+        </div>
+        <div class="card-body stack" style="gap:.5rem;">
+          <h1 style="text-align: left; margin-bottom: 2rem;">{{ person[1] }}</h1>
+          <div class="muted">Dynasty: <a href="{{ url_for('user.dynasty_detail', dynasty_id=person[6]) }}">{{ person[7] }}</a></div>
+          <div class="muted small">Born: {{ person[2] or 'Unknown' }} - Died: {{ person[3] or 'Unknown' }}</div>
+        </div>
+      </aside>
+
+      <article class="card">
+        <div class="card-body">
+          <h2>Biography</h2>
+          <hr class="section-rule">
+          <p class="muted">{{ person[4] or 'No biography available.' }}</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="stack">
+      <details class="card" open>
+        <summary class="card-body" style="cursor:pointer; color:var(--gold); font-family:'Playfair Display',serif;">Reigns & Capitals</summary>
+        <div class="card-body">
+          {% if reigns %}
+            <table class="detail-table">
+              <thead><tr><th>Title</th><th>Capital</th><th>From</th><th>To</th></tr></thead>
+              <tbody>
+                {% for r in reigns %}
+                  <tr><td><span class="badge text-bg-info">{{ r[1] }}</span></td><td>{{ r[2] or '' }}</td><td>{{ r[3] }}</td><td>{{ r[4] or person[3] or 'Unknown' }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="muted">No reign records found.</p>
+          {% endif %}
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary class="card-body" style="cursor:pointer; color:var(--gold); font-family:'Playfair Display',serif;">Spouses</summary>
+        <div class="card-body">
+          {% if spouses %}
+            <table class="detail-table">
+              <thead><tr><th>Name</th><th>From</th><th>To</th><th>Notes</th></tr></thead>
+              <tbody>
+                {% for s in spouses %}
+                  <tr>
+                    <td><a href="{{ url_for('user.ruler_detail', person_id=s[0]) }}">{{ s[1] }}</a></td>
+                    <td>{{ s[2] or '' }}</td>
+                    <td>{{ s[3] or '' }}</td>
+                    <td class="muted small">{{ s[4] or '' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="muted">No spouse records found.</p>
+          {% endif %}
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary class="card-body" style="cursor:pointer; color:var(--gold); font-family:'Playfair Display',serif;">Children</summary>
+        <div class="card-body">
+          {% if children %}
+            <div class="cluster">{% for c in children %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('user.ruler_detail', person_id=c[0]) }}">{{ c[1] }}</a>{% endfor %}</div>
+          {% else %}
+            <p class="muted">No children recorded.</p>
+          {% endif %}
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary class="card-body" style="cursor:pointer; color:var(--gold); font-family:'Playfair Display',serif;">Parents</summary>
+        <div class="card-body">
+          {% if parents %}
+            <div class="cluster">{% for p in parents %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('user.ruler_detail', person_id=p[0]) }}">{{ p[1] }}</a>{% endfor %}</div>
+          {% else %}
+            <p class="muted">No parents recorded.</p>
+          {% endif %}
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary class="card-body" style="cursor:pointer; color:var(--gold); font-family:'Playfair Display',serif;">Succession</summary>
+        <div class="card-body">
+          <div class="muted small">They succeeded</div>
+          {% if succeeded %}
+            <div class="cluster" style="margin:.35rem 0 .75rem;">{% for s in succeeded %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('user.ruler_detail', person_id=s[1]) }}">{{ s[2] }}</a>{% endfor %}</div>
+          {% else %}<p class="muted">No predecessor recorded.</p>{% endif %}
+          <div class="muted small">Succeeded by</div>
+          {% if successors %}
+            <div class="cluster" style="margin-top:.35rem;">{% for s in successors %}<a class="btn btn-outline-light btn-sm" href="{{ url_for('user.ruler_detail', person_id=s[1]) }}">{{ s[2] }}</a>{% endfor %}</div>
+          {% else %}<p class="muted">No successor recorded.</p>{% endif %}
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary class="card-body" style="cursor:pointer; color:var(--gold); font-family:'Playfair Display',serif;">Events participated in</summary>
+        <div class="card-body">
+          {% if events %}
+            <table class="detail-table">
+              <thead><tr><th>Date</th><th>Type</th><th>Name</th><th>Role</th></tr></thead>
+              <tbody>
+                {% for e in events %}
+                  <tr><td>{{ e[3] or '' }}</td><td><span class="badge text-bg-warning">{{ e[2] }}</span></td><td>{{ e[1] }}</td><td class="muted">{{ e[5] or '' }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="muted">No events recorded for this ruler.</p>
+          {% endif %}
+        </div>
+      </details>
+    </section>
+  </div>
+{% endblock %}
+

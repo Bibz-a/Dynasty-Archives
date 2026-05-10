@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Suggest Edit • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <a class="btn btn-outline-light btn-sm" href="{{ back_url }}">Back</a>
+    <article class="card">
+      <div class="card-body">
+        <h1>Suggest an edit</h1>
+        <p class="muted">Help improve this {{ entity_type }} record: <strong>{{ entity_name }}</strong></p>
+        <hr class="section-rule">
+
+        <form method="post" class="stack">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div>
+            <label class="form-label">Field</label>
+            <select class="form-select" name="field_name" required>
+              <option value="">Select a field...</option>
+              {% for f in fields %}
+                <option value="{{ f }}">{{ f }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label">Current values</label>
+            <div class="stack" style="gap:.35rem;">
+              {% for key, value in current_values.items() %}
+                <div class="muted small"><strong>{{ key }}:</strong> {{ value or '' }}</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label">Suggested new value</label>
+            <textarea class="form-control" rows="4" name="new_value" required></textarea>
+          </div>
+
+          <div>
+            <label class="form-label">Reason (optional)</label>
+            <textarea class="form-control" rows="3" name="reason"></textarea>
+          </div>
+
+          <div class="cluster">
+            <button class="btn btn-light" type="submit">Submit suggestion</button>
+            <a class="btn btn-outline-light" href="{{ back_url }}">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </article>
+  </section>
+{% endblock %}

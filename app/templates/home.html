@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Home • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <style>
+    .hero {
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(10,8,6,0.92) 0%, rgba(10,8,6,0.52) 55%, rgba(10,8,6,0.28) 100%);
+      pointer-events: none;
+    }
+    .hero-content {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      padding: 0 2rem;
+      z-index: 1;
+    }
+  </style>
+
+  <section class="card hero">
+    <div class="media-16x9" style="min-height: 300px;">
+      <img src="/images/dynasty.jpg" alt="Dynasty Archives hero">
+      <div class="hero-content">
+        <h1 style="font-size: clamp(36px, 5.6vw, 84px); color:#feedd2; white-space: nowrap; line-height: 1; margin: 0 auto; text-shadow: 0 2px 12px rgba(0,0,0,0.75), 0 0 28px rgba(245,240,232,0.2);">Dynasty Archives</h1>
+        <p style="font-size: 20px; font-family: var(--font-body); font-style: italic; color: #e5cfa3; letter-spacing: 0.05em; max-width: 760px; margin:.55rem auto 0; text-shadow: 0 1px 8px rgba(0,0,0,0.7);">
+          A cinematic historical index of rulers, empires, territories, and turning points.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="stack" style="margin-top:1rem;">
+    <div class="card-grid stat-cards">
+      <article class="card">
+        <div class="card-body">
+          <div class="stat-label muted small">Dynasties</div>
+          <div class="stat-number" style="color: var(--gold); font-size:2rem; font-weight:700;">{{ stats.dynasties }}</div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-body">
+          <div class="stat-label muted small">Rulers</div>
+          <div class="stat-number" style="color: var(--gold); font-size:2rem; font-weight:700;">{{ stats.rulers }}</div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-body">
+          <div class="stat-label muted small">Events</div>
+          <div class="stat-number" style="color: var(--gold); font-size:2rem; font-weight:700;">{{ stats.events }}</div>
+        </div>
+      </article>
+    </div>
+
+    <div class="card-grid">
+      <a class="card card-hover" href="{{ url_for('user.dynasties') }}" style="border-top:2px solid var(--gold);">
+        <div class="media-16x9">
+          <img src="/images/dynasty.jpg" alt="Dynasties">
+        </div>
+        <div class="card-body">
+          <h2>Dynasties</h2>
+          <p class="muted small">Browse imperial houses and their legacies.</p>
+        </div>
+      </a>
+      <a class="card card-hover" href="{{ url_for('user.rulers') }}" style="border-top:2px solid var(--gold);">
+        <div class="media-16x9">
+          <img src="/images/rulers.jpg" alt="Rulers">
+        </div>
+        <div class="card-body">
+          <h2>Rulers</h2>
+          <p class="muted small">Trace lineages, reigns, and successions.</p>
+        </div>
+      </a>
+      <a class="card card-hover" href="{{ url_for('user.events') }}" style="border-top:2px solid var(--gold);">
+        <div class="media-16x9">
+          <img src="/images/events.jpg" alt="Events">
+        </div>
+        <div class="card-body">
+          <h2>Events</h2>
+          <p class="muted small">Study treaties, battles, and historic shifts.</p>
+        </div>
+      </a>
+    </div>
+
+    <div class="cluster">
+      <a class="btn btn-light" href="{{ url_for('user.dynasties') }}">Browse Dynasties</a>
+      <a class="btn btn-outline-light" href="{{ url_for('user.rulers') }}">Browse Rulers</a>
+      <a class="btn btn-outline-light" href="{{ url_for('user.events') }}">Browse Events</a>
+      <a class="btn btn-outline-light" href="{{ url_for('user.territories') }}">Browse Territories</a>
+      <a class="btn btn-outline-light" href="{{ url_for('user.timeline') }}">View Timeline</a>
+    </div>
+  </section>
+
+  <script>
+    document.querySelectorAll('.stat-number').forEach(el => {
+      const target = parseInt(el.textContent);
+      let current = 0;
+      const step = Math.ceil(target / 30);
+      const timer = setInterval(() => {
+        current = Math.min(current + step, target);
+        el.textContent = current;
+        if (current >= target) clearInterval(timer);
+      }, 30);
+    });
+  </script>
+{% endblock %}

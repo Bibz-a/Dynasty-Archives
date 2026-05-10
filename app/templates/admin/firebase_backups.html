@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Firebase Backups • Admin{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <article class="card">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <h1 style="margin-bottom:0;">Firebase Realtime Backups</h1>
+          <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin.dashboard') }}">Back to Dashboard</a>
+        </div>
+        <p class="muted small" style="margin-top:.6rem;">
+          New backups store one base64-encoded SQL file per table under a timestamped folder. Legacy single-file nodes still appear here.
+        </p>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-body">
+        {% if backups %}
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th>Folder / backup</th>
+                <th>Tables &amp; size</th>
+                <th>Created at</th>
+                <th>Restore</th>
+                <th>Delete</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for b in backups %}
+                <tr>
+                  <td>
+                    <strong>{{ b.folder }}</strong>
+                    {% if b.multi %}
+                      <div class="muted small" style="margin-top:.25rem;">RTDB key: <code>{{ b.key }}</code></div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if b.multi %}
+                      <div class="muted small">{{ b.total_tables }} tables • {{ b.size_kb }} KB total</div>
+                      <details class="table-list" style="margin-top:.4rem;">
+                        <summary>{{ b.total_tables }} tables — click to expand</summary>
+                        <ul class="backup-table-ul">
+                          {% for t in b.tables_detail %}
+                            <li><i class="ti ti-table"></i> {{ t.name }}.sql <span class="muted small">({{ t.size_kb }} KB)</span></li>
+                          {% endfor %}
+                        </ul>
+                      </details>
+                    {% else %}
+                      <span class="muted small">Legacy single SQL file • {{ b.size_kb }} KB</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ b.created_at }}</td>
+                  <td>
+                    <details class="restore-confirm">
+                      <summary class="btn btn-outline-warning btn-sm">Restore ↺</summary>
+                      <div class="restore-form">
+                        <p class="restore-warning">
+                          <i class="ti ti-alert-triangle"></i>
+                          This will replace all current data (dynasties, rulers, events, territories, etc.) with data from
+                          <strong>{{ b.folder }}</strong>.
+                          Your schema and user accounts will not be changed.
+                          This cannot be undone.
+                        </p>
+                        <form method="POST" action="{{ url_for('admin.firebase_backup_restore', key=b.key) }}">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                          <input
+                            type="password"
+                            name="password"
+                            placeholder="Enter your admin password to confirm"
+                            required
+                            autocomplete="off"
+                            class="form-control"
+                          >
+                          <button type="submit" class="btn btn-outline-danger btn-sm">Confirm Restore</button>
+                        </form>
+                      </div>
+                    </details>
+                  </td>
+                  <td>
+                    <form method="post" action="{{ url_for('admin.firebase_backup_delete', key=b.key) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="btn btn-outline-danger btn-sm" type="submit">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted">No backups in Firebase Realtime Database yet.</p>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+  <style>
+    .restore-confirm summary { list-style: none; cursor: pointer; display: inline-flex; }
+    .restore-confirm summary::-webkit-details-marker { display: none; }
+    .restore-form {
+      margin-top: .6rem;
+      padding: .7rem;
+      border-left: 3px solid rgba(209, 92, 92, 0.8);
+      background: rgba(18, 16, 14, 0.86);
+      border-radius: 8px;
+      min-width: 320px;
+    }
+    .restore-warning { margin: 0 0 .6rem; color: #f0cd76; font-size: .85rem; }
+    .restore-form form { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    .restore-form input[type="password"] { min-width: 220px; }
+    .table-list summary { cursor: pointer; color: #e4c36a; font-size: .88rem; }
+    .backup-table-ul { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .85rem; }
+    .backup-table-ul li { margin: .2rem 0; }
+  </style>
+{% endblock %}

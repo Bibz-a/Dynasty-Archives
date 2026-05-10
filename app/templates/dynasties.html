@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Dynasties • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <div class="spaced">
+      <h1 style="text-align: left; margin-bottom: 2rem;">Dynasties</h1>
+      <span class="badge text-bg-secondary">{{ dynasties|length }} total</span>
+    </div>
+    <div class="card-grid">
+      {% for d in dynasties %}
+        <a class="card card-hover animated-link" href="{{ url_for('user.dynasty_detail', dynasty_id=d[0]) }}">
+          <div class="media-16x9">
+            {% if d[5] %}
+              {% set img_src = d[5] %}
+              {% if not (img_src.startswith('http://') or img_src.startswith('https://') or img_src.startswith('/images/')) %}
+                {% set img_src = url_for('project_images', filename=img_src) %}
+              {% endif %}
+              <img src="{{ img_src }}" alt="{{ d[1] }}">
+            {% else %}
+              <div class="img-placeholder img-placeholder--wide"><span>{{ (d[1] or 'D')[0]|upper }}</span></div>
+            {% endif %}
+          </div>
+          <div class="card-body stack" style="gap:.4rem;">
+            <h2 class="card-title" style="font-size:1.3rem;">{{ d[1] }}</h2>
+            <div class="muted small">{{ d[2] or '?' }} - {{ d[3] or 'Present' }}</div>
+            <p class="muted small" style="margin:0;">{{ d[4] or 'No description available.' }}</p>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Dynasties • Admin{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-body p-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h1 class="h4 mb-0">Manage Dynasties</h1>
+        <a class="btn btn-light" href="{{ url_for('admin.dynasty_add') }}">Add Dynasty</a>
+      </div>
+
+      <div class="table-responsive mt-3">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Start</th>
+              <th>End</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in dynasties %}
+              <tr>
+                <td class="fw-semibold">{{ d[1] }}</td>
+                <td>{{ d[2] or '' }}</td>
+                <td>{{ d[3] or '' }}</td>
+                <td class="text-end">
+                  <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin.dynasty_edit', dynasty_id=d[0]) }}">Edit</a>
+                  <form method="post" action="{{ url_for('admin.dynasty_delete', dynasty_id=d[0]) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-outline-danger btn-sm" type="submit" onclick="return confirm('Delete dynasty? This may fail if it is referenced by persons/events.')">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

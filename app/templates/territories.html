@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Territories • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <div class="spaced">
+      <h1 style="text-align: left; margin-bottom: 2rem;">Territories</h1>
+      <span class="badge text-bg-secondary">{{ territories|length }} rows</span>
+    </div>
+    <div class="card-grid">
+      {% for t in territories %}
+        <article class="card card-hover">
+          <div class="media-16x9">
+            {% if t[3] %}
+              {% set img_src = t[3] %}
+              {% if not (img_src.startswith('http://') or img_src.startswith('https://') or img_src.startswith('/images/')) %}
+                {% set img_src = url_for('project_images', filename=img_src) %}
+              {% endif %}
+              <img src="{{ img_src }}" alt="{{ t[1] }}">
+            {% else %}
+              <div class="img-placeholder img-placeholder--wide"><span>{{ (t[1] or 'T')[0]|upper }}</span></div>
+            {% endif %}
+          </div>
+          <div class="card-body stack" style="gap:.35rem;">
+            <h2 style="font-size:1.15rem;"><a href="{{ url_for('user.territory_detail', territory_id=t[0]) }}">{{ t[1] }}</a></h2>
+            <div class="muted small">{{ t[2] or 'Unknown region' }}</div>
+            <p class="muted small" style="margin:0;">{{ t[4] or 'No linked dynasties' }}</p>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}
+

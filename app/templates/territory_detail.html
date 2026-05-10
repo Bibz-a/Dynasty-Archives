@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}{{ territory[1] }} • Territory{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <a class="btn btn-outline-light btn-sm" href="{{ url_for('user.territories') }}">Back to territories</a>
+    <article class="card">
+      <div class="card-body">
+        <h1>{{ territory[1] }}</h1>
+        <div class="cluster">
+          <span class="badge text-bg-secondary">{{ territory[2] or 'Unknown region' }}</span>
+          {% if territory[3] %}<span class="badge text-bg-secondary">{{ territory[3] }}</span>{% endif %}
+        </div>
+        <p class="muted" style="margin-top:.7rem;">{{ territory[4] or 'No description available.' }}</p>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-body">
+        <h2>Control Timeline</h2>
+        <hr class="section-rule">
+        {% if control_timeline %}
+          <div class="stack">
+            {% for item in control_bars %}
+              {% set row = item[0] %}
+              <div>
+                <div class="spaced"><strong>{{ row[1] }}</strong><span class="muted small">{{ row[2] or '?' }} - {{ row[3] or 'Present' }}</span></div>
+                <div style="height:10px; background:rgba(255,255,255,0.08); border-radius:6px; overflow:hidden;">
+                  <div style="height:100%; width:{{ '%.2f'|format(item[1]) }}%; background:linear-gradient(90deg,#c9a84c,#e4c36a);"></div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted">No control timeline recorded.</p>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+{% endblock %}

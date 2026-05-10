@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Wars & Battles • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <div class="spaced">
+      <h1 style="text-align: left; margin-bottom: 2rem;">Wars & Battles</h1>
+      <span class="badge text-bg-secondary">{{ wars|length }} results</span>
+    </div>
+    <form class="card" method="get" action="{{ url_for('user.wars') }}">
+      <div class="card-body" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:.6rem;">
+        <select class="form-select" name="emperor_id">
+          <option value="">All rulers (participants)</option>
+          {% for p in rulers %}
+            <option value="{{ p[0] }}" {% if emperor_id and emperor_id|string == p[0]|string %}selected{% endif %}>{{ p[1] }}</option>
+          {% endfor %}
+        </select>
+        <input class="form-control" type="number" name="year_start" placeholder="Year start" value="{{ year_start or '' }}">
+        <input class="form-control" type="number" name="year_end" placeholder="Year end" value="{{ year_end or '' }}">
+        <select class="form-select" name="type">
+          <option value="">War + Battle</option>
+          <option value="war" {% if type == 'war' %}selected{% endif %}>War</option>
+          <option value="battle" {% if type == 'battle' %}selected{% endif %}>Battle</option>
+        </select>
+        <div class="cluster">
+          <button class="btn btn-light" type="submit">Filter</button>
+          <a class="btn btn-outline-light" href="{{ url_for('user.wars') }}">Reset</a>
+        </div>
+      </div>
+    </form>
+    <div class="card-grid">
+      {% for w in wars %}
+        <a class="card card-hover" href="{{ url_for('user.war_detail', event_id=w[0]) }}">
+          <div class="card-body stack" style="gap:.35rem;">
+            <h2 style="font-size:1.2rem;">{{ w[1] }}</h2>
+            <div class="cluster"><span class="badge text-bg-warning">{{ w[8] }}</span><span class="muted small">{{ w[2] or '' }}{% if w[3] %} - {{ w[3] }}{% endif %}</span></div>
+            <div class="muted small">{{ w[4] or 'Unknown location' }}</div>
+            <div class="muted small">Dynasty: {{ w[6] or 'N/A' }}</div>
+            {% set pc = w[7]|int %}
+            <div class="badge text-bg-secondary">
+              {% if pc == 1 %}
+                1 recorded participant
+              {% else %}
+                {{ pc }} recorded participants
+              {% endif %}
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

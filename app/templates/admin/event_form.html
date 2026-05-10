@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == 'add' %}Add Event{% else %}Edit Event{% endif %} • Admin{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-9">
+      <div class="card">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <h1 class="h4 mb-0">{% if mode == 'add' %}Add Event{% else %}Edit Event{% endif %}</h1>
+            <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin.events_list') }}">Back</a>
+          </div>
+
+          <form method="post" class="row g-3 mt-1" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="col-12">
+              <label class="form-label">Name</label>
+              <input class="form-control" name="name" required value="{{ event[1] if event else '' }}">
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="form-label">Type</label>
+              <select class="form-select" name="type" required>
+                <option value="">Select type...</option>
+                {% for t in types %}
+                  <option value="{{ t }}" {% if event and event[2] == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label class="form-label">Event date</label>
+              <input class="form-control" type="date" name="event_date" value="{{ event[3] if event and event[3] else '' }}">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label">End date</label>
+              <input class="form-control" type="date" name="end_date" value="{{ event[4] if event and event[4] else '' }}">
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="form-label">Location</label>
+              <input class="form-control" name="location" value="{{ event[5] if event else '' }}">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Dynasty (optional)</label>
+              <select class="form-select" name="dynasty_id">
+                <option value="">None</option>
+                {% for d in dynasties %}
+                  <option value="{{ d[0] }}" {% if event and event[8] == d[0] %}selected{% endif %}>{{ d[1] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Description</label>
+              <textarea class="form-control" rows="4" name="description">{{ event[6] if event else '' }}</textarea>
+            </div>
+
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Image URL</label>
+              <input id="image_url" class="form-control" name="image_url" value="{{ event[7] if event else '' }}" placeholder="/images/events/example.jpg">
+            </div>
+            <div class="col-12 col-lg-6">
+              {% if event and event[7] %}
+                <div class="mb-2">
+                  <div class="muted small mb-1">Current image</div>
+                  {% set img_src = event[7] %}
+                  {% if not (img_src.startswith('http://') or img_src.startswith('https://') or img_src.startswith('/images/')) %}
+                    {% set img_src = url_for('project_images', filename=img_src) %}
+                  {% endif %}
+                  <img src="{{ img_src }}" alt="Current image" class="rounded border" style="max-width: 220px; height: auto;">
+                </div>
+              {% endif %}
+              <label class="form-label">Upload new image</label>
+              <input id="image_file" class="form-control" type="file" name="image_file" accept="image/jpeg,image/png,image/webp">
+              <small>Max 2MB. Use local paths like /images/events/file.jpg. Selecting a file will auto-fill local path format.</small>
+            </div>
+
+            <div class="col-12">
+              <hr>
+              <h2 class="h6 mb-2">War/Battle links (optional)</h2>
+              <p class="muted small mb-3">For wars or battles, choose participants and explicitly related battles.</p>
+            </div>
+
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Participant rulers</label>
+              <select class="form-select" name="participant_ids" multiple size="8">
+                {% for p in people %}
+                  <option value="{{ p[0] }}" {% if p[0] in selected_participant_ids %}selected{% endif %}>{{ p[1] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-lg-6">
+              <label class="form-label">Related battles</label>
+              <select class="form-select" name="related_battle_ids" multiple size="8">
+                {% for b in battle_events %}
+                  <option value="{{ b[0] }}" {% if b[0] in selected_related_battle_ids %}selected{% endif %}>{{ b[1] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-light" type="submit">{% if mode == 'add' %}Create{% else %}Save changes{% endif %}</button>
+              <a class="btn btn-outline-light" href="{{ url_for('admin.events_list') }}">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const fileInput = document.getElementById("image_file");
+      const urlInput = document.getElementById("image_url");
+      if (!fileInput || !urlInput) return;
+      fileInput.addEventListener("change", function () {
+        const f = fileInput.files && fileInput.files[0];
+        if (!f) return;
+        const safe = f.name.toLowerCase().replace(/\s+/g, "_");
+        urlInput.value = "/images/events/" + safe;
+      });
+    })();
+  </script>
+{% endblock %}
+

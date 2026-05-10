@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <article class="card">
+      <div class="card-body">
+        <h1>Admin Panel</h1>
+        <p class="muted">Create, update, and delete dynasty and ruler records.</p>
+      </div>
+    </article>
+
+    <div style="display:grid; gap:1rem; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));">
+      <article class="card"><div class="card-body"><div class="muted small">Dynasties</div><div style="color:var(--gold); font-size:2rem; font-weight:700;">{{ counts.dynasties }}</div><a class="btn btn-light btn-sm" href="{{ url_for('admin.dynasties_list') }}">Manage</a></div></article>
+      <article class="card"><div class="card-body"><div class="muted small">Persons</div><div style="color:var(--gold); font-size:2rem; font-weight:700;">{{ counts.persons }}</div><a class="btn btn-light btn-sm" href="{{ url_for('admin.persons_list') }}">Manage</a></div></article>
+      <article class="card"><div class="card-body"><div class="muted small">Events</div><div style="color:var(--gold); font-size:2rem; font-weight:700;">{{ counts.events }}</div><a class="btn btn-light btn-sm" href="{{ url_for('admin.events_list') }}">Manage</a></div></article>
+      <article class="card"><div class="card-body"><div class="muted small">Territories</div><div style="color:var(--gold); font-size:2rem; font-weight:700;">{{ counts.territories }}</div><span class="badge text-bg-secondary">Viewer pages ready</span></div></article>
+    </div>
+
+    <article class="card">
+      <div class="card-body">
+        <h2>Quick links</h2>
+        <hr class="section-rule">
+        <div class="cluster">
+          <a class="btn btn-outline-light" href="{{ url_for('admin.dynasty_add') }}">Add Dynasty</a>
+          <a class="btn btn-outline-light" href="{{ url_for('admin.person_add') }}">Add Person</a>
+          <a class="btn btn-outline-light" href="{{ url_for('admin.event_add') }}">Add Event</a>
+          <a class="btn btn-outline-light" href="{{ url_for('admin.edit_requests_list') }}">
+            Edit Requests
+            <span class="badge text-bg-secondary">{{ pending_edit_count }}</span>
+          </a>
+          <a class="btn btn-outline-light" href="{{ url_for('user.dynasties') }}">View Dynasties</a>
+          <a class="btn btn-outline-light" href="{{ url_for('user.rulers') }}">View Rulers</a>
+          <a class="btn btn-outline-light" href="{{ url_for('user.events') }}">View Events</a>
+          <a class="btn btn-outline-light" href="{{ url_for('user.timeline') }}">View Timeline</a>
+        </div>
+        <hr class="section-rule">
+        <form method="post" action="{{ url_for('admin.backup_database') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-light" type="submit">Backup Database</button>
+          <a class="btn btn-outline-light" href="{{ url_for('admin.backup_list') }}">View All Backups →</a>
+          <a class="btn btn-outline-light" href="{{ url_for('admin.firebase_backups') }}">Firebase RTDB Backups →</a>
+        </form>
+        <p class="muted small" style="margin-top:.55rem;">
+          <i class="ti ti-info-circle"></i>
+          To restore from a backup, go to
+          <a href="{{ url_for('admin.firebase_backups') }}">Firebase Backup Archive</a>.
+        </p>
+        {% if last_backup %}
+          <div class="muted small" style="margin-top:.65rem;">
+            Last backup at {{ last_backup[1] }}:
+            {% set last_parts = last_backup[0].split(' | ') if last_backup[0] else [] %}
+            {% for part in last_parts %}
+              {% if part.startswith('Firebase RTDB: ') %}
+                <a href="{{ part.replace('Firebase RTDB: ', '') }}" target="_blank" rel="noreferrer">Firebase RTDB ↗</a>
+              {% elif part.startswith('Supabase: ') %}
+                <a href="{{ part.replace('Supabase: ', '') }}" target="_blank" rel="noreferrer">Supabase ↗</a>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </article>
+
+    <div style="display:grid; gap:1rem; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));">
+      <article class="card">
+        <div class="card-body">
+          <h2>Recent Activity</h2>
+          <hr class="section-rule">
+          {% if recent_activity %}
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Who</th>
+                  <th>Action</th>
+                  <th>Table</th>
+                  <th>Record ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for a in recent_activity %}
+                  <tr>
+                    <td class="muted small">{{ a[4]|relative_time }}</td>
+                    <td>{{ a[3] or 'system' }}</td>
+                    <td>
+                      {% if a[1] == 'INSERT' %}
+                        <span class="badge" style="background:rgba(83, 180, 104, 0.2); border-color:rgba(83, 180, 104, 0.6); color:#8be69b;">{{ a[1] }}</span>
+                      {% elif a[1] == 'UPDATE' %}
+                        <span class="badge" style="background:rgba(201, 168, 76, 0.2); border-color:rgba(201, 168, 76, 0.55); color:#f0cd76;">{{ a[1] }}</span>
+                      {% elif a[1] == 'DELETE' %}
+                        <span class="badge" style="background:rgba(209, 92, 92, 0.2); border-color:rgba(209, 92, 92, 0.55); color:#f4a3a3;">{{ a[1] }}</span>
+                      {% else %}
+                        <span class="badge text-bg-secondary">{{ a[1] }}</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ a[0] }}</td>
+                    <td>{{ a[2] if a[2] is not none else '-' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="muted">No recent activity.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-body">
+          <h2>Backup History</h2>
+          <hr class="section-rule">
+          {% if recent_backups %}
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Who</th>
+                  <th>File</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for b in recent_backups %}
+                  <tr>
+                    <td class="muted small">{{ b[0]|relative_time }}</td>
+                    <td>{{ b[1] or 'system' }}</td>
+                    <td>
+                      {% set parts = b[2].split(' | ') if b[2] else [] %}
+                      {% for part in parts %}
+                        {% if part.startswith('Firebase RTDB: ') %}
+                          <a href="{{ part.replace('Firebase RTDB: ', '') }}" target="_blank" rel="noreferrer">Firebase RTDB ↗</a>
+                        {% elif part.startswith('Supabase: ') %}
+                          <a href="{{ part.replace('Supabase: ', '') }}" target="_blank" rel="noreferrer">Supabase ↗</a>
+                        {% endif %}
+                      {% endfor %}
+                      {% for part in parts %}
+                        {% if part.startswith('Errors: ') %}
+                          <div class="small" style="margin-top:.35rem; color:#f0cd76;">{{ part }}</div>
+                        {% endif %}
+                      {% endfor %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="muted">No backups yet.</p>
+          {% endif %}
+        </div>
+      </article>
+    </div>
+
+    <article class="card" style="margin-top:1.8rem; border-color:rgba(209,92,92,.35); background:linear-gradient(180deg, rgba(80,26,26,0.18), rgba(26,23,19,0.92));">
+      <div class="card-body">
+        <h2 style="color:#e39b9b;">Danger Zone</h2>
+        <p class="muted small">Permanently deletes all records. Cannot be undone.</p>
+        <a class="btn btn-outline-danger" href="{{ url_for('admin.clear_db_confirm_page') }}">Clear Database</a>
+      </div>
+    </article>
+  </section>
+{% endblock %}
+

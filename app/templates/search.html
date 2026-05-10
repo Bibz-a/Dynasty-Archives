@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Search • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <h1 style="text-align: left; margin-bottom: 2rem;">Search</h1>
+    <form method="get" action="{{ url_for('user.search') }}" class="cluster">
+      <input class="form-control" style="max-width:420px;" type="search" name="q" value="{{ q or '' }}" placeholder="Search rulers, dynasties, events, territories...">
+      <button class="btn btn-light" type="submit">Search</button>
+    </form>
+    <div class="muted small">Total results: {{ total_count }}</div>
+
+    {% if total_count == 0 and q %}
+      <p class="muted empty-state">Nothing found for '{{ q }}'</p>
+    {% endif %}
+
+    {% for etype, rows in grouped_results.items() %}
+      {% if rows %}
+        <article class="card">
+          <div class="card-body">
+            <h2 style="text-transform:capitalize;">{{ etype }} ({{ rows|length }})</h2>
+            <hr class="section-rule">
+            <div class="stack" style="gap:.5rem;">
+              {% for r in rows %}
+                <div>
+                  {% if etype == 'ruler' %}
+                    <a href="{{ url_for('user.ruler_detail', person_id=r[1]) }}">{{ r[2] }}</a>
+                  {% elif etype == 'dynasty' %}
+                    <a href="{{ url_for('user.dynasty_detail', dynasty_id=r[1]) }}">{{ r[2] }}</a>
+                  {% elif etype == 'event' %}
+                    <a href="{{ url_for('user.event_detail', event_id=r[1]) }}">{{ r[2] }}</a>
+                  {% elif etype == 'territory' %}
+                    <a href="{{ url_for('user.territory_detail', territory_id=r[1]) }}">{{ r[2] }}</a>
+                  {% endif %}
+                  {% if r[3] %}<span class="muted small"> — {{ r[3] }}</span>{% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </article>
+      {% endif %}
+    {% endfor %}
+  </section>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Statistics • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <h1 style="text-align: left; margin-bottom: 2rem;">Statistics & Records</h1>
+
+    <div class="card-grid">
+      <article class="card"><div class="card-body"><div class="muted small">Longest Reign</div>{% if longest_reigning %}<a href="{{ url_for('user.ruler_detail', person_id=longest_reigning[2]) }}"><strong>{{ longest_reigning[0] }}</strong></a><div class="muted small">{{ longest_reigning[1] }} • {{ longest_reigning[3] }} days</div>{% else %}<div class="muted">N/A</div>{% endif %}</div></article>
+      <article class="card"><div class="card-body"><div class="muted small">Most Wars/Battles</div>{% if most_wars %}<a href="{{ url_for('user.ruler_detail', person_id=most_wars[1]) }}"><strong>{{ most_wars[0] }}</strong></a><div class="muted small">{{ most_wars[2] }} events</div>{% else %}<div class="muted">N/A</div>{% endif %}</div></article>
+      <article class="card"><div class="card-body"><div class="muted small">Most Territories</div>{% if most_territories %}<a href="{{ url_for('user.dynasty_detail', dynasty_id=most_territories[1]) }}"><strong>{{ most_territories[0] }}</strong></a><div class="muted small">{{ most_territories[2] }} territories</div>{% else %}<div class="muted">N/A</div>{% endif %}</div></article>
+    </div>
+
+    <article class="card">
+      <div class="card-body">
+        <h2>War Outcomes</h2>
+        <hr class="section-rule">
+        <div class="stack">
+          {% for o in outcome_counts %}
+            <div class="spaced">
+              <span class="badge text-bg-secondary">{{ o[0] }}</span>
+              <span>{{ o[1] }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-body">
+        <h2>Succession Chain</h2>
+        <hr class="section-rule">
+        <div class="cluster" style="row-gap:.9rem;">
+          {% for s in succession_chain %}
+            <span class="badge text-bg-secondary">{{ s[4] or '?' }}</span>
+            {% if s[6] %}<a href="{{ url_for('user.ruler_detail', person_id=s[6]) }}">{{ s[1] }}</a>{% else %}<span>{{ s[1] }}</span>{% endif %}
+            <span style="color:var(--gold);">→</span>
+            {% if s[7] %}<a href="{{ url_for('user.ruler_detail', person_id=s[7]) }}">{{ s[2] }}</a>{% else %}<span>{{ s[2] }}</span>{% endif %}
+            {% if not loop.last %}<span style="opacity:.35;">|</span>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </article>
+  </section>
+{% endblock %}

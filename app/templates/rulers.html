@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Rulers • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <div class="spaced">
+      <h1 style="text-align: left; margin-bottom: 2rem;">Rulers</h1>
+      <span class="badge text-bg-secondary">{{ rulers|length }} rows</span>
+    </div>
+
+    <form class="card" method="get" action="{{ url_for('user.rulers') }}">
+      <div class="card-body stack" style="gap:.8rem;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:.6rem;">
+          <input class="form-control" type="search" name="search" placeholder="Search name..." value="{{ search or '' }}">
+          <select class="form-select" name="dynasty_id">
+            <option value="">All dynasties</option>
+            {% for d in dynasties %}
+              <option value="{{ d[0] }}" {% if dynasty_id and dynasty_id|int == d[0] %}selected{% endif %}>{{ d[1] }}</option>
+            {% endfor %}
+          </select>
+          <input class="form-control" type="text" name="title" placeholder="Title..." value="{{ title or '' }}">
+          <input class="form-control" type="number" name="era_start" placeholder="Era start year" value="{{ era_start or '' }}">
+          <input class="form-control" type="number" name="era_end" placeholder="Era end year" value="{{ era_end or '' }}">
+          <select class="form-select" name="sort">
+            <option value="name" {% if sort == 'name' %}selected{% endif %}>Sort: Name</option>
+            <option value="reign_start" {% if sort == 'reign_start' %}selected{% endif %}>Sort: Reign Start</option>
+            <option value="reign_length" {% if sort == 'reign_length' %}selected{% endif %}>Sort: Reign Length</option>
+          </select>
+        </div>
+        <div class="cluster">
+          <label class="muted small">
+            <input type="checkbox" name="no_events" value="1" {% if no_events %}checked{% endif %}>
+            No events only
+          </label>
+          <button class="btn btn-light" type="submit">Apply Filters</button>
+          <a class="btn btn-outline-light" href="{{ url_for('user.rulers') }}">Reset</a>
+        </div>
+      </div>
+    </form>
+
+    <div class="card-grid">
+      {% for r in rulers %}
+        <a class="card card-hover animated-link" href="{{ url_for('user.ruler_detail', person_id=r[0]) }}">
+          <div class="media-16x9">
+            {% if r[8] %}
+              {% set img_src = r[8] %}
+              {% if not (img_src.startswith('http://') or img_src.startswith('https://') or img_src.startswith('/images/')) %}
+                {% set img_src = url_for('project_images', filename=img_src) %}
+              {% endif %}
+              <img src="{{ img_src }}" alt="{{ r[1] }}">
+            {% else %}
+              <div class="img-placeholder img-placeholder--wide"><span>{{ (r[1] or 'R')[0]|upper }}</span></div>
+            {% endif %}
+          </div>
+          <div class="card-body stack" style="gap:.38rem;">
+            <h2 class="card-title" style="font-size:1.2rem;">{{ r[1] }}</h2>
+            <div class="muted small">{{ r[2] }}</div>
+            <div>{% if r[3] %}<span class="badge text-bg-info">{{ r[3] }}</span>{% endif %}</div>
+            <div class="muted small">{{ r[4] or '' }} - {{ r[5] or r[7] or 'Unknown' }}</div>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

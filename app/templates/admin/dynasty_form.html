@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == 'add' %}Add Dynasty{% else %}Edit Dynasty{% endif %} • Admin{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+      <div class="card">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <h1 class="h4 mb-0">{% if mode == 'add' %}Add Dynasty{% else %}Edit Dynasty{% endif %}</h1>
+            <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin.dynasties_list') }}">Back</a>
+          </div>
+
+          <form method="post" class="row g-3 mt-1" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="col-12">
+              <label class="form-label">Name</label>
+              <input class="form-control" name="name" required value="{{ dynasty[1] if dynasty else '' }}">
+            </div>
+
+            <div class="col-6">
+              <label class="form-label">Start year</label>
+              <input class="form-control" type="number" name="start_year" value="{{ dynasty[2] if dynasty else '' }}">
+            </div>
+            <div class="col-6">
+              <label class="form-label">End year</label>
+              <input class="form-control" type="number" name="end_year" value="{{ dynasty[3] if dynasty else '' }}">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Description</label>
+              <textarea class="form-control" rows="4" name="description">{{ dynasty[4] if dynasty else '' }}</textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Image URL</label>
+              <input id="image_url" class="form-control" name="image_url" value="{{ dynasty[5] if dynasty else '' }}" placeholder="/images/dynasties/example.jpg">
+            </div>
+
+            <div class="col-12">
+              {% if dynasty and dynasty[5] %}
+                <div class="mb-2">
+                  <div class="muted small mb-1">Current image</div>
+                  {% set img_src = dynasty[5] %}
+                  {% if not (img_src.startswith('http://') or img_src.startswith('https://') or img_src.startswith('/images/')) %}
+                    {% set img_src = url_for('project_images', filename=img_src) %}
+                  {% endif %}
+                  <img src="{{ img_src }}" alt="Current image" class="rounded border" style="max-width: 220px; height: auto;">
+                </div>
+              {% endif %}
+              <label class="form-label">Upload new image</label>
+              <input id="image_file" class="form-control" type="file" name="image_file" accept="image/jpeg,image/png,image/webp">
+              <small>Max 2MB. Use local paths like /images/dynasties/file.jpg. Selecting a file will auto-fill local path format.</small>
+            </div>
+
+            <div class="col-12">
+              <hr>
+              <h2 class="h6 mb-2">Optional links</h2>
+              <p class="muted small mb-3">Select rulers, territories, and events to link with this dynasty.</p>
+            </div>
+
+            <div class="col-12 col-lg-4">
+              <label class="form-label">Rulers</label>
+              <select class="form-select" name="ruler_ids" multiple size="7">
+                {% for p in people %}
+                  <option value="{{ p[0] }}" {% if p[0] in selected_ruler_ids %}selected{% endif %}>{{ p[1] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-lg-4">
+              <label class="form-label">Territories</label>
+              <select class="form-select" name="territory_ids" multiple size="7">
+                {% for t in territories %}
+                  <option value="{{ t[0] }}" {% if t[0] in selected_territory_ids %}selected{% endif %}>{{ t[1] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-lg-4">
+              <label class="form-label">Events</label>
+              <select class="form-select" name="event_ids" multiple size="7">
+                {% for e in events %}
+                  <option value="{{ e[0] }}" {% if e[0] in selected_event_ids %}selected{% endif %}>{{ e[1] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-light" type="submit">{% if mode == 'add' %}Create{% else %}Save changes{% endif %}</button>
+              <a class="btn btn-outline-light" href="{{ url_for('admin.dynasties_list') }}">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const fileInput = document.getElementById("image_file");
+      const urlInput = document.getElementById("image_url");
+      if (!fileInput || !urlInput) return;
+      fileInput.addEventListener("change", function () {
+        const f = fileInput.files && fileInput.files[0];
+        if (!f) return;
+        const safe = f.name.toLowerCase().replace(/\s+/g, "_");
+        urlInput.value = "/images/dynasties/" + safe;
+      });
+    })();
+  </script>
+{% endblock %}
+

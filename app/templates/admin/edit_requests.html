@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Requests • Admin{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <div class="spaced">
+      <h1>Edit Requests</h1>
+      <span class="badge text-bg-secondary">{{ pending_count }} pending</span>
+    </div>
+
+    <article class="card">
+      <div class="card-body">
+        {% if requests %}
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th>Entity</th>
+                <th>Field</th>
+                <th>Current</th>
+                <th>Suggested</th>
+                <th>Reason</th>
+                <th>Submitted By</th>
+                <th>Submitted At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in requests %}
+                <tr>
+                  <td>
+                    {% if r[1] == 'person' %}
+                      <a href="{{ url_for('user.ruler_detail', person_id=r[2]) }}">{{ r[1] }} #{{ r[2] }}</a>
+                    {% elif r[1] == 'dynasty' %}
+                      <a href="{{ url_for('user.dynasty_detail', dynasty_id=r[2]) }}">{{ r[1] }} #{{ r[2] }}</a>
+                    {% else %}
+                      {{ r[1] }} #{{ r[2] }}
+                    {% endif %}
+                  </td>
+                  <td>{{ r[3] }}</td>
+                  <td class="muted small">{{ r[4] or '' }}</td>
+                  <td>{{ r[5] }}</td>
+                  <td class="muted small">{{ r[6] or '' }}</td>
+                  <td><a href="#">{{ r[7] }}</a></td>
+                  <td class="muted small">{{ r[8]|relative_time }}</td>
+                  <td>
+                    <div class="cluster">
+                      <form method="post" action="{{ url_for('admin.edit_request_approve', request_id=r[0]) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-light btn-sm" type="submit">Approve</button>
+                      </form>
+                      <form method="post" action="{{ url_for('admin.edit_request_decline', request_id=r[0]) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-outline-danger btn-sm" type="submit">Decline</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted">No pending edit requests.</p>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+{% endblock %}

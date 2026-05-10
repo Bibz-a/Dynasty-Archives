@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Backup Archive • Admin{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <article class="card">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <h1 style="margin-bottom:0;">Backup Archive</h1>
+          <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin.dashboard') }}">Back to Dashboard</a>
+        </div>
+        <p class="muted small" style="margin-top:.6rem;">Supabase Storage: folders are timestamped backup runs; each contains one <code>.sql</code> file per table.</p>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-body">
+        {% if backups_grouped %}
+          {% for folder, files in backups_grouped.items() %}
+            <details class="backup-folder" {% if loop.first %}open{% endif %}>
+              <summary class="backup-folder-summary">
+                <i class="ti ti-folder"></i>
+                {% if folder %}{{ folder }}{% else %}<span class="muted">(root)</span>{% endif %}
+                <span class="file-count">{{ files|length }} file{% if files|length != 1 %}s{% endif %}</span>
+              </summary>
+              <div class="backup-folder-body">
+                {% for file in files %}
+                  <div class="backup-file-row">
+                    <span class="backup-file-label">
+                      <i class="ti ti-file-code"></i>
+                      {{ file.get('path') or file.get('name', '') }}
+                    </span>
+                    <form method="post" action="{{ url_for('admin.backup_download', filename=file.get('path') or file.get('name', '')) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-outline-light btn-sm">Download ↓</button>
+                    </form>
+                  </div>
+                {% endfor %}
+              </div>
+            </details>
+          {% endfor %}
+        {% else %}
+          <p class="muted">No backups found in Supabase.</p>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+  <style>
+    .backup-folder { margin-bottom: 1rem; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; overflow: hidden; }
+    .backup-folder-summary {
+      list-style: none;
+      cursor: pointer;
+      padding: .75rem 1rem;
+      background: rgba(0,0,0,0.25);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      flex-wrap: wrap;
+    }
+    .backup-folder-summary::-webkit-details-marker { display: none; }
+    .file-count { margin-left: auto; font-size: .85rem; color: #c9a84c; }
+    .backup-folder-body { padding: .5rem 1rem 1rem; }
+    .backup-file-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      flex-wrap: wrap;
+      padding: .45rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .backup-file-row:last-child { border-bottom: none; }
+    .backup-file-label { font-size: .9rem; word-break: break-all; }
+  </style>
+{% endblock %}

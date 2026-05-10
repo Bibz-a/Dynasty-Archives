@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Timeline • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <section class="stack">
+    <div class="spaced">
+      <h1 style="text-align: left; margin-bottom: 2rem;">Timeline</h1>
+      <span class="badge text-bg-secondary">{{ events|length }} events</span>
+    </div>
+
+    <form class="card" method="get" action="{{ url_for('user.timeline') }}">
+      <div class="card-body stack">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:.6rem;">
+          <input class="form-control" type="number" name="start_year" value="{{ start_year or '' }}" placeholder="Start year">
+          <input class="form-control" type="number" name="end_year" value="{{ end_year or '' }}" placeholder="End year">
+          <select class="form-select" name="emperor_id">
+            <option value="">All rulers (any participant)</option>
+            {% for p in rulers %}
+              <option value="{{ p[0] }}" {% if emperor_id and emperor_id|string == p[0]|string %}selected{% endif %}>{{ p[1] }}</option>
+            {% endfor %}
+          </select>
+          <select class="form-select" name="dynasty_id">
+            <option value="">All dynasties</option>
+            {% for d in dynasties %}
+              <option value="{{ d[0] }}" {% if dynasty_id and dynasty_id|int == d[0] %}selected{% endif %}>{{ d[1] }}</option>
+            {% endfor %}
+          </select>
+          <select class="form-select" name="event_type">
+            <option value="">All types</option>
+            {% for t in types %}
+              <option value="{{ t }}" {% if event_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="cluster">
+          <input type="hidden" name="view" value="{{ view or 'list' }}">
+          <button class="btn btn-light" type="submit">Apply</button>
+          <a class="btn btn-outline-light" href="{{ url_for('user.timeline') }}">Clear</a>
+          {% if view == 'visual' %}
+            <a class="btn btn-outline-light" href="{{ url_for('user.timeline', start_year=start_year, end_year=end_year, emperor_id=emperor_id, dynasty_id=dynasty_id, event_type=event_type, view='list') }}">List view</a>
+          {% else %}
+            <a class="btn btn-outline-light" href="{{ url_for('user.timeline', start_year=start_year, end_year=end_year, emperor_id=emperor_id, dynasty_id=dynasty_id, event_type=event_type, view='visual') }}">Visual view</a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+
+    <div class="card">
+      <div class="card-body">
+        {% if events %}
+          {% if view == 'visual' %}
+            <div class="timeline">
+              {% for e in events %}
+                <article class="timeline-item">
+                  <span class="timeline-dot"></span>
+                  <div class="card" style="background:rgba(0,0,0,0.22);">
+                    <div class="card-body">
+                      <div class="spaced">
+                        <h2 style="font-size:1.08rem;">{{ e[1] }}</h2>
+                        <div class="muted small">{{ e[3] }}</div>
+                      </div>
+                      <div class="cluster" style="margin-top:.35rem;">
+                        <span class="badge text-bg-warning">{{ e[2] }}</span>
+                        {% if e[5] %}<span class="badge text-bg-secondary">{{ e[5] }}</span>{% endif %}
+                        {% if e[4] %}<span class="muted small">{{ e[4] }}</span>{% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <table class="detail-table">
+              <thead><tr><th>Date</th><th>Name</th><th>Type</th><th>Location</th><th>Dynasty</th></tr></thead>
+              <tbody>
+                {% for e in events %}
+                  <tr>
+                    <td>{{ e[3] or '' }}</td>
+                    <td><a href="{{ url_for('user.event_detail', event_id=e[0]) }}">{{ e[1] }}</a></td>
+                    <td><span class="badge text-bg-warning">{{ e[2] }}</span></td>
+                    <td class="muted">{{ e[4] or '' }}</td>
+                    <td class="muted">{{ e[5] or '' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% endif %}
+        {% else %}
+          <p class="muted">No events found for this range.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+{% endblock %}
+

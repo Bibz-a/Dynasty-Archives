@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}{{ dynasty[1] }} • Dynasty Archives{% endblock %}
+
+{% block content %}
+  <div class="stack">
+    <div class="cluster">
+      <a class="btn btn-outline-light btn-sm" href="{{ url_for('user.dynasties') }}">Back to dynasties</a>
+      {% if current_user.is_authenticated %}
+        <a href="{{ url_for('user.suggest_dynasty_edit', dynasty_id=dynasty[0]) }}" class="btn btn-outline-light btn-sm">
+          Suggest an edit
+        </a>
+      {% else %}
+        <span class="suggest-locked">
+          <i class="ti ti-lock" aria-hidden="true">🔒</i>
+          Only registered users can suggest edits -
+          <a href="{{ url_for('auth.login') }}">log in</a>
+          or <a href="{{ url_for('auth.register') }}">register</a>
+        </span>
+      {% endif %}
+    </div>
+
+    <section class="detail-layout">
+      <aside class="card">
+        <div class="card-body">
+          {% if dynasty[5] %}
+            {% set img_src = dynasty[5] %}
+            {% if not (img_src.startswith('http://') or img_src.startswith('https://') or img_src.startswith('/images/')) %}
+              {% set img_src = url_for('project_images', filename=img_src) %}
+            {% endif %}
+            <img src="{{ img_src }}" alt="{{ dynasty[1] }}" style="width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:8px;">
+          {% else %}
+            <div class="img-placeholder">
+              <span>{{ (dynasty[1] or 'D')[0] | upper }}</span>
+            </div>
+          {% endif %}
+        </div>
+        <div class="card-body stack" style="gap:.5rem;">
+          <h1 style="text-align: left; margin-bottom: 2rem;">{{ dynasty[1] }}</h1>
+          <div class="muted">{{ dynasty[2] }} - {{ dynasty[3] or '?' }}</div>
+          {% if dynasty[5] %}
+            <a class="btn btn-outline-light btn-sm" href="{{ img_src }}" target="_blank" rel="noreferrer">Open image</a>
+          {% endif %}
+        </div>
+      </aside>
+
+      <div class="stack">
+        <article class="card">
+          <div class="card-body">
+            <h2>Archive Notes</h2>
+            <hr class="section-rule">
+            <p class="muted">{{ dynasty[4] or 'No dynasty description available.' }}</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-body">
+            <div class="spaced">
+              <h2>Rulers</h2>
+              <span class="badge text-bg-secondary">{{ rulers|length }}</span>
+            </div>
+            <hr class="section-rule">
+            {% if rulers %}
+              <table class="detail-table">
+                <thead><tr><th>Name</th><th>Title</th><th>From</th><th>To</th></tr></thead>
+                <tbody>
+                  {% for r in rulers %}
+                    <tr>
+                      <td><a href="{{ url_for('user.ruler_detail', person_id=r[0]) }}">{{ r[1] }}</a></td>
+                      <td><span class="badge text-bg-info">{{ r[2] }}</span></td>
+                      <td>{{ r[3] }}</td>
+                      <td>{{ r[4] or r[5] or 'Unknown' }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% else %}
+              <p class="muted">No rulers found for this dynasty yet.</p>
+            {% endif %}
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+      <article class="card">
+        <div class="card-body">
+          <div class="spaced">
+            <h2>Territories</h2>
+            <span class="badge text-bg-secondary">{{ territories|length }}</span>
+          </div>
+          <hr class="section-rule">
+          {% if territories %}
+            <div class="stack" style="gap:.7rem;">
+              {% for t in territories %}
+                <div class="card" style="background:rgba(0,0,0,0.22);">
+                  <div class="card-body" style="padding:.75rem .85rem;">
+                    <div class="spaced">
+                      <strong>{{ t[1] }}</strong>
+                      <span class="badge text-bg-secondary">{{ t[3] or '' }}{% if t[4] %}-{{ t[4] }}{% endif %}</span>
+                    </div>
+                    <div class="muted small">{{ t[2] or '' }}</div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted">No territories recorded for this dynasty.</p>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-body">
+          <div class="spaced">
+            <h2>Related Events</h2>
+            <span class="badge text-bg-secondary">{{ events|length }}</span>
+          </div>
+          <hr class="section-rule">
+          {% if events %}
+            <table class="detail-table">
+              <thead><tr><th>Date</th><th>Type</th><th>Name</th><th>Location</th></tr></thead>
+              <tbody>
+                {% for e in events %}
+                  <tr>
+                    <td>{{ e[3] or '' }}</td>
+                    <td><span class="badge text-bg-warning">{{ e[2] }}</span></td>
+                    <td><a href="{{ url_for('user.event_detail', event_id=e[0]) }}">{{ e[1] }}</a></td>
+                    <td class="muted">{{ e[4] or '' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="muted">No events linked to this dynasty.</p>
+          {% endif %}
+        </div>
+      </article>
+    </section>
+  </div>
+{% endblock %}
+

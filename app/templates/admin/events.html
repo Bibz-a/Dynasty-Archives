@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Events • Admin{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-body p-4">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h1 class="h4 mb-0">Manage Events</h1>
+        <a class="btn btn-light" href="{{ url_for('admin.event_add') }}">Add Event</a>
+      </div>
+
+      <div class="table-responsive mt-3">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Name</th>
+              <th>Location</th>
+              <th>Dynasty</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in events %}
+              <tr>
+                <td>{{ e[3] or '' }}</td>
+                <td><span class="badge text-bg-warning">{{ e[2] }}</span></td>
+                <td class="fw-semibold">{{ e[1] }}</td>
+                <td class="muted">{{ e[4] or '' }}</td>
+                <td class="muted">{{ e[5] or '' }}</td>
+                <td class="text-end">
+                  <a class="btn btn-outline-light btn-sm" href="{{ url_for('admin.event_edit', event_id=e[0]) }}">Edit</a>
+                  <form method="post" action="{{ url_for('admin.event_delete', event_id=e[0]) }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-outline-danger btn-sm" type="submit" onclick="return confirm('Delete event?')">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
