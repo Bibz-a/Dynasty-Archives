@@ -3,6 +3,82 @@
 {% block title %}Admin Dashboard • Dynasty Archives{% endblock %}
 
 {% block content %}
+  <style>
+    .backup-history-list { display: flex; flex-direction: column; gap: 0.85rem; }
+    .backup-history-row {
+      display: grid;
+      grid-template-columns: minmax(7rem, 9rem) 1fr;
+      gap: 0.75rem 1.25rem;
+      align-items: start;
+      padding: 0.75rem 0.85rem;
+      border: 1px solid rgba(201, 168, 76, 0.18);
+      border-radius: 10px;
+      background: rgba(26, 23, 19, 0.55);
+    }
+    @media (max-width: 640px) {
+      .backup-history-row { grid-template-columns: 1fr; }
+    }
+    .backup-history-time {
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      display: block;
+      line-height: 1.35;
+    }
+    .backup-history-who {
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 0.2rem;
+    }
+    .backup-history-destinations {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.65rem;
+      align-items: flex-start;
+    }
+    .backup-dest-chip {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.35rem 0.5rem;
+      padding: 0.4rem 0.65rem;
+      border-radius: 8px;
+      background: rgba(201, 168, 76, 0.08);
+      border: 1px solid rgba(201, 168, 76, 0.22);
+      max-width: 100%;
+    }
+    .backup-dest-label {
+      font-family: var(--font-heading);
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold);
+      flex-shrink: 0;
+    }
+    .backup-dest-chip a {
+      font-size: var(--font-size-sm);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      color: var(--gold);
+    }
+    .backup-dest-meta {
+      font-size: 0.82rem;
+      line-height: 1.35;
+      word-break: break-word;
+      width: 100%;
+      margin-top: 0.15rem;
+    }
+    .backup-history-warn {
+      width: 100%;
+      margin-top: 0.35rem;
+      padding: 0.45rem 0.55rem;
+      border-radius: 6px;
+      font-size: var(--font-size-sm);
+      background: rgba(209, 92, 92, 0.12);
+      border: 1px solid rgba(209, 92, 92, 0.35);
+      color: #f0cd76;
+    }
+  </style>
   <section class="stack">
     <article class="card">
       <div class="card-body">
@@ -53,9 +129,11 @@
             {% set last_parts = last_backup[0].split(' | ') if last_backup[0] else [] %}
             {% for part in last_parts %}
               {% if part.startswith('Firebase RTDB: ') %}
-                <a href="{{ part.replace('Firebase RTDB: ', '') }}" target="_blank" rel="noreferrer">Firebase RTDB ↗</a>
+                <a href="{{ url_for('admin.firebase_backups') }}">Firebase backup archive</a>
+                <span class="muted">({{ part.replace('Firebase RTDB: ', '') }})</span>
               {% elif part.startswith('Supabase: ') %}
-                <a href="{{ part.replace('Supabase: ', '') }}" target="_blank" rel="noreferrer">Supabase ↗</a>
+                <a href="{{ url_for('admin.backup_list') }}">Supabase backup archive</a>
+                <span class="muted">({{ part.replace('Supabase: ', '') }})</span>
               {% endif %}
             {% endfor %}
           </div>
@@ -110,42 +188,45 @@
       <article class="card">
         <div class="card-body">
           <h2>Backup History</h2>
-          <hr class="section-rule">
+          <p class="muted small" style="margin:-0.5rem 0 1rem;">Recent database backup runs (Firebase + Supabase). Use <strong>Open</strong> to manage files.</p>
           {% if recent_backups %}
-            <table class="detail-table">
-              <thead>
-                <tr>
-                  <th>When</th>
-                  <th>Who</th>
-                  <th>File</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for b in recent_backups %}
-                  <tr>
-                    <td class="muted small">{{ b[0]|relative_time }}</td>
-                    <td>{{ b[1] or 'system' }}</td>
-                    <td>
-                      {% set parts = b[2].split(' | ') if b[2] else [] %}
+            <div class="backup-history-list">
+              {% for b in recent_backups %}
+                {% set parts = b[2].split(' | ') if b[2] else [] %}
+                <div class="backup-history-row">
+                  <div>
+                    <span class="backup-history-time">{{ b[0]|relative_time }}</span>
+                    <span class="backup-history-who">{{ b[1] or 'system' }}</span>
+                  </div>
+                  <div>
+                    <div class="backup-history-destinations">
                       {% for part in parts %}
                         {% if part.startswith('Firebase RTDB: ') %}
-                          <a href="{{ part.replace('Firebase RTDB: ', '') }}" target="_blank" rel="noreferrer">Firebase RTDB ↗</a>
+                          <div class="backup-dest-chip">
+                            <span class="backup-dest-label">Firebase</span>
+                            <a href="{{ url_for('admin.firebase_backups') }}">Open archive</a>
+                            <span class="muted backup-dest-meta">{{ part.replace('Firebase RTDB: ', '') }}</span>
+                          </div>
                         {% elif part.startswith('Supabase: ') %}
-                          <a href="{{ part.replace('Supabase: ', '') }}" target="_blank" rel="noreferrer">Supabase ↗</a>
+                          <div class="backup-dest-chip">
+                            <span class="backup-dest-label">Supabase</span>
+                            <a href="{{ url_for('admin.backup_list') }}">Open archive</a>
+                            <span class="muted backup-dest-meta">{{ part.replace('Supabase: ', '') }}</span>
+                          </div>
                         {% endif %}
                       {% endfor %}
-                      {% for part in parts %}
-                        {% if part.startswith('Errors: ') %}
-                          <div class="small" style="margin-top:.35rem; color:#f0cd76;">{{ part }}</div>
-                        {% endif %}
-                      {% endfor %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+                    </div>
+                    {% for part in parts %}
+                      {% if part.startswith('Errors: ') %}
+                        <div class="backup-history-warn"><strong>Warnings:</strong> {{ part.replace('Errors: ', '') }}</div>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
           {% else %}
-            <p class="muted">No backups yet.</p>
+            <p class="muted">No backups yet. Run <strong>Backup Database</strong> above.</p>
           {% endif %}
         </div>
       </article>
