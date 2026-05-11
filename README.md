@@ -1,5 +1,14 @@
 # Dynasty Archives
 
+[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![SQL](https://img.shields.io/badge/SQL-336791?style=for-the-badge)](https://www.postgresql.org/docs/current/sql.html)
+[![Mermaid](https://img.shields.io/badge/Mermaid-diagrams-FF3670?style=for-the-badge&logo=mermaid&logoColor=white)](https://mermaid.js.org/)
+[![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/docs/Web/HTML)
+[![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)](https://developer.mozilla.org/docs/Web/CSS)
+[![Jinja](https://img.shields.io/badge/Jinja2-B41717?style=for-the-badge&logo=jinja&logoColor=white)](https://jinja.palletsprojects.com/)
+[![Markdown](https://img.shields.io/badge/Markdown-000000?style=for-the-badge&logo=markdown&logoColor=white)](https://commonmark.org/)
+
 **Dynasty Archives** is a small, opinionated history catalog: browse dynasties and the people who ruled them, trace events on a timeline, map territories to empires, and (if you’re an admin) curate the database behind it. The stack is familiar—**Flask**, **PostgreSQL**, **Jinja** templates—with **Firebase** (Realtime Database + optional Google Sign-In) and **Supabase Storage** for backup files, plus a deliberate split between repo-root **`images/`** and admin uploads.
 
 Whether you’re demoing a course project or extending the schema, this README walks you from empty clone to a running app, then calls out **known limitations** (especially around images and paths) so you don’t chase ghosts.
@@ -125,6 +134,14 @@ psql -h localhost -U postgres -d dynasty_db -f sql/schema.sql
 
 The seed line inserts a placeholder admin row — replace its password with a real hash before relying on it (see [First login & admin user](#first-login--admin-user)).
 
+**Optional — demo catalog data** (dynasties, rulers, events, territories, etc.):
+
+```bash
+psql -h localhost -U postgres -d dynasty_db -f seed/catalog_seed.sql
+```
+
+See **`seed/README.md`** for reloading on a non-empty database (`optional_reset_catalog.sql`).
+
 ### Step 3 — Secrets and environment variables
 
 1. Copy **`.env.example`** to **`secrets/.env`** (create the `secrets` folder if needed).
@@ -224,7 +241,7 @@ Or update the seeded `admin` user from `schema.sql` (replace `CHANGE_ME_TO_BCRYP
 - **`admin`** → after login, redirect to **`/admin/`**.
 - **`viewer`** → redirect to **`/`**.
 
-**Note:** `login_manager.login_view` in **`app/__init__.py`** may still say `admin.login` while the real route is **`auth.login`**. If admin pages do not send you to `/login`, set `login_manager.login_view = "auth.login"` in `create_app`.
+**Note:** `login_manager.login_view` is set to **`"auth.login"`** in **`app/__init__.py`** so unauthenticated access to protected routes redirects to **`/login`**.
 
 ---
 
@@ -289,11 +306,13 @@ DynastyArchives/
 ├── images/                  # Served at /images/
 ├── sql/
 │   └── schema.sql           # Full DDL: enums, triggers, views, procedures
+├── seed/                    # Optional catalog INSERTs (see seed/README.md)
 ├── tests/                   # pytest (real PostgreSQL)
 ├── run.py
 ├── requirements.txt
 ├── .env.example
 ├── README.md
+├── LICENSE                  # MIT (see License section)
 ├── database-schema-diagram.md
 ├── erd-explanation.md
 └── erd-complete-advanced.md
@@ -306,9 +325,12 @@ DynastyArchives/
 | File | Contents |
 |------|----------|
 | **`sql/schema.sql`** | Source of truth for tables, constraints, triggers, views, procedures |
+| **`seed/`** | Optional **`catalog_seed.sql`** to load demo catalog after schema |
 | **`database-schema-diagram.md`** | Tables, columns, FK arrows, Mermaid diagram |
 | **`erd-explanation.md`** | Conceptual ER: cardinality, participation, weak entities |
 | **`erd-complete-advanced.md`** | Chen-style hand-draw guide |
+| **`CODEBASE-GUIDE.md`** | How the app is wired (blueprints, DB, backups) |
+| **`LICENSE`** | MIT license text |
 
 ---
 
@@ -349,7 +371,7 @@ Firebase restore runs **TRUNCATE**, replay **INSERT**s, **`Audit_Log`** insert, 
 | Backup fails | **`DATABASE_URL`** set correctly; **`pg_dump`** on PATH; user can connect to that database. |
 | Images 404 | File exists under **`images/`**; DB path matches (**`/images/...`**); no typos in folder names; see [Images & static assets](#images--static-assets). |
 | CSRF errors on POST | Forms include **`csrf_token()`**; tests use `WTF_CSRF_ENABLED=False` in **`tests/conftest.py`**. |
-| Admin redirect not to `/login` | Set **`login_manager.login_view = "auth.login"`** (see [First login](#first-login--admin-user)). |
+| Admin redirect not to `/login` | Confirm **`login_manager.login_view = "auth.login"`** in **`create_app`** (see [First login](#first-login--admin-user)). |
 
 ---
 
@@ -366,7 +388,7 @@ This section is intentionally honest: it describes rough edges in the current co
 
 ### Auth and admin UX
 
-- **`login_view` mismatch**: If `login_manager.login_view` still points at **`admin.login`** while login lives under **`auth.login`**, unauthenticated visits to admin may not redirect cleanly—aligning the blueprint name fixes it (see [First login](#first-login--admin-user)).
+- **`login_view`**: Must stay aligned with the real login blueprint (**`auth.login`** → **`/login`**). A wrong endpoint name breaks redirects for **`@login_required`** routes.
 - **Role gates**: Ensure production **`User_Account.role`** values match what **`@role_required`** expects (`admin` vs `viewer`).
 
 ### Database and schema
@@ -392,3 +414,15 @@ This section is intentionally honest: it describes rough edges in the current co
 1. Use a focused branch and clear commits.
 2. Run **`python -m pytest tests/ -v`** after DB-related changes.
 3. Update **`sql/schema.sql`** and this README when you add migrations, env vars, or major behavior.
+
+---
+
+## License
+
+This project is licensed under the **MIT License** — see the [`LICENSE`](LICENSE) file in the repository root for the full text.
+
+You may use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, subject to the conditions in that file (including retaining the copyright notice and permission notice in copies or substantial portions of the software).
+
+**Third-party assets** (for example images under **`images/`**, fonts, or UI kit resources) may carry their own licenses. You are responsible for complying with those terms if you redistribute them.
+
+If this is a **course or academic** submission, keep any attribution or licensing language required by your institution in addition to the MIT terms.

@@ -131,7 +131,7 @@ def create_app() -> Flask:
         return {"last_query": _pick_query_preview(qlog)}
 
     login_manager = LoginManager()
-    login_manager.login_view = "admin.login"
+    login_manager.login_view = "auth.login"
     login_manager.init_app(app)
 
     @login_manager.user_loader
